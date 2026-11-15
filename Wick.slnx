@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Wick.Blazor/Wick.Blazor.csproj" />
+    <Project Path="src/Wick.CodeFixes/Wick.CodeFixes.csproj" />
     <Project Path="src/Wick.Core/Wick.Core.csproj" />
     <Project Path="src/Wick.Generators/Wick.Generators.csproj" />
   </Folder>

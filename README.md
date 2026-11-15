@@ -70,7 +70,7 @@ Add Wick to your repository as a git submodule:
 
 ```sh
 git submodule add https://github.com/ivanjx/wick.git lib/wick
-dotnet sln add lib/wick/src/Wick.Core/Wick.Core.csproj lib/wick/src/Wick.Blazor/Wick.Blazor.csproj lib/wick/src/Wick.Generators/Wick.Generators.csproj
+dotnet sln add lib/wick/src/Wick.Core/Wick.Core.csproj lib/wick/src/Wick.Blazor/Wick.Blazor.csproj lib/wick/src/Wick.Generators/Wick.Generators.csproj lib/wick/src/Wick.CodeFixes/Wick.CodeFixes.csproj
 ```
 
 Then reference the projects from your Blazor app:
@@ -79,6 +79,9 @@ Then reference the projects from your Blazor app:
 <ItemGroup>
   <ProjectReference Include="..\lib\wick\src\Wick.Blazor\Wick.Blazor.csproj" />
   <ProjectReference Include="..\lib\wick\src\Wick.Generators\Wick.Generators.csproj"
+                    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  <!-- Optional: IDE quick fixes for Wick's warnings. -->
+  <ProjectReference Include="..\lib\wick\src\Wick.CodeFixes\Wick.CodeFixes.csproj"
                     OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 </ItemGroup>
 ```
@@ -358,6 +361,8 @@ It waits for the whole process, so tests running in parallel can delay it, but n
 | WK0007 | Warning | A reactive component declares its own `Dispose` or `DisposeAsync` |
 | WK0008 | Warning | An element of an array held by a reactive property is written in place; readers are not notified |
 
+WK0001, WK0002, WK0006 and WK0007 come with IDE quick fixes: add `partial`, switch to the reactive collection, or override `Dispose(bool)`/`DisposeAsyncCore()`. For WK0007, the fix only applies to C# files; in a `.razor` file, move the cleanup into the override yourself.
+
 Warnings can be suppressed with `#pragma warning disable` or in `.editorconfig`.
 
 ## Sample apps
@@ -383,6 +388,7 @@ dotnet run --project samples/Wick.Sample.Wasm
 | `src/Wick.Core` | Reactive state, collections, derived values, effects, batching. No Blazor dependency. |
 | `src/Wick.Blazor` | `ReactiveComponentBase`, `ReactiveLayoutComponentBase`, `ReactiveRegion` |
 | `src/Wick.Generators` | Source generator for `[ReactiveState]` and the analyzers |
+| `src/Wick.CodeFixes` | IDE quick fixes for the analyzer warnings |
 | `tests/` | Unit, generator and bUnit component tests |
 | `samples/Wick.Sample` | Interactive Server demo app |
 | `samples/Wick.Sample.Wasm` | WebAssembly demo app |

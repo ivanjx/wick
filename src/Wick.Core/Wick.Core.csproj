@@ -11,9 +11,10 @@
     <InternalsVisibleTo Include="Wick.Blazor.Tests" />
   </ItemGroup>
 
-  <!-- The source generator ships inside this package (analyzers/dotnet/cs); Core does not use it itself. -->
+  <!-- The source generator and its IDE code fixes ship inside this package (analyzers/dotnet/cs); Core does not use them itself. -->
   <ItemGroup>
     <ProjectReference Include="..\Wick.Generators\Wick.Generators.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="..\Wick.CodeFixes\Wick.CodeFixes.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -21,7 +22,7 @@
   </PropertyGroup>
 
   <Target Name="IncludeGeneratorInPackage">
-    <MSBuild Projects="..\Wick.Generators\Wick.Generators.csproj" Targets="GetTargetPath">
+    <MSBuild Projects="..\Wick.Generators\Wick.Generators.csproj;..\Wick.CodeFixes\Wick.CodeFixes.csproj" Targets="GetTargetPath">
       <Output TaskParameter="TargetOutputs" ItemName="_ReactiveGeneratorAssembly" />
     </MSBuild>
 
