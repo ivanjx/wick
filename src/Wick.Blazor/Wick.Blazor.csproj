@@ -1,11 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
+  <PropertyGroup>
+    <Description>Blazor components that re-render only when the Wick reactive state they read changes, from any thread.</Description>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Wick.Core\Wick.Core.csproj" />
+    <!-- PrivateAssets="none": by default the package dependency excludes analyzers, which would hide the generator Wick.Core carries. -->
+    <ProjectReference Include="..\Wick.Core\Wick.Core.csproj" PrivateAssets="none" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <Description>Fine-grained reactive state for .NET: tracked properties, collections, derived values and effects. Includes the [ReactiveState] source generator.</Description>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Wick.Blazor" />
     <InternalsVisibleTo Include="Wick.Core.Tests" />
