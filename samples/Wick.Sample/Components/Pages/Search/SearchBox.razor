@@ -1,0 +1,14 @@
+@inject SearchState State
+
+<input type="text" placeholder="Type “ada” quickly" @bind="State.Query" @bind:event="oninput" />
+
+<p class="hint">
+    "a" answers after @Latency("a"), "ad" after @Latency("ad"), "ada" after @Latency("ada").
+    Renders: <RenderCount Value="++_renders" />.
+</p>
+
+@code {
+    private int _renders;
+
+    private static string Latency(string query) => $"{LanguageCatalog.LatencyFor(query).TotalSeconds:0.0} s";
+}

@@ -1,0 +1,82 @@
+@page "/search"
+@using Microsoft.JSInterop
+@inject SearchState State
+@inject LanguageCatalog Catalog
+@inject IJSRuntime JS
+
+@* No <PageTitle>: the title is set by an effect below, through JavaScript interop. *@
+
+<h1>Async effects</h1>
+<p class="lead">
+    The search is an asynchronous component effect: it reads <code>Query</code> before its first <code>await</code>,
+    so typing re-runs it. A new query cancels the token of the search in progress, and the next search starts only
+    once that one has finished. The fake API answers short queries slower, so typing <em>ada</em> quickly would let
+    the slow <em>a</em> search overwrite the results without this. A second effect sets the browser tab's title
+    through JavaScript interop; its re-runs start on the component's dispatcher, so it needs no
+    <code>InvokeAsync</code>. This page renders nothing it reads, so its effects never re-render it.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <h2>Search</h2>
+        <SearchBox />
+    </div>
+
+    <div class="card">
+        <h2>Results</h2>
+        <SearchResults />
+    </div>
+
+    <div class="card">
+        <h2>Runs</h2>
+        <SearchLog />
+    </div>
+</div>
+
+@code {
+    // Effect runs never overlap, so this plain counter is safe.
+    private int _runs;
+
+    protected override void OnInitialized()
+    {
+        Effect(SearchAsync);
+        Effect(ShowTitleAsync);
+    }
+
+    private async Task SearchAsync(CancellationToken token)
+    {
+        var query = State.Query.Trim();
+        var run = ++_runs;
+
+        if (query.Length == 0)
+        {
+            State.Results = [];
+            State.IsSearching = false;
+
+            return;
+        }
+
+        State.IsSearching = true;
+
+        try
+        {
+            var results = await Catalog.SearchAsync(query, token);
+
+            State.Results = results;
+            State.IsSearching = false;
+            State.AddLog($"#{run} \"{query}\": {results.Count} results after {LanguageCatalog.LatencyFor(query).TotalSeconds:0.0} s");
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Superseded by a newer query, which has not started yet; it owns IsSearching now.
+            State.AddLog($"#{run} \"{query}\": cancelled");
+        }
+    }
+
+    private async Task ShowTitleAsync(CancellationToken token)
+    {
+        var title = State.IsSearching ? "Searching…" : $"{State.Results.Count} results";
+
+        await JS.InvokeVoidAsync("sample.setTitle", token, $"{title} · Wick");
+    }
+}

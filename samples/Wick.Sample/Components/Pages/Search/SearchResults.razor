@@ -1,0 +1,16 @@
+@inject SearchState State
+
+<p class="hint">@(State.IsSearching ? "Searching…" : $"{State.Results.Count} results")</p>
+
+<ul class="activity">
+    @foreach (var result in State.Results)
+    {
+        <li>@result</li>
+    }
+</ul>
+
+<p class="hint">The previous results stay while a search runs. Renders: <RenderCount Value="++_renders" />.</p>
+
+@code {
+    private int _renders;
+}
