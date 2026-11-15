@@ -15,7 +15,7 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     private int _dirty;
     private int _pendingFlushes;
     private volatile bool _disposed;
-    private List<ReactiveEffect>? _effects;
+    private List<IDisposable>? _owned;
 
     private protected ReactiveComponentCore()
     {
@@ -56,25 +56,45 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     /// </remarks>
     /// <param name="run">The side effect; reactive state it reads becomes its dependencies.</param>
     /// <param name="onError">Receives exceptions thrown by runs; see <see cref="Reactive.Effect"/>.</param>
-    protected ReactiveEffect Effect(Action run, Action<Exception>? onError = null)
-    {
-        var effect = Reactive.Effect(run, onError);
+    protected ReactiveEffect Effect(Action run, Action<Exception>? onError = null) => Own(Reactive.Effect(run, onError));
 
-        // The private observer guards _effects: it never locks itself, and a dedicated Lock would cost every
-        // component an allocation even when it creates no effects.
+    /// <summary>
+    /// Component-owned form of <see cref="Reactive.Resource{TSource, T}"/>: the resource is disposed (cancelling an
+    /// in-flight fetch) together with the component. Typically created in <c>OnInitialized</c>; the component
+    /// re-renders when <see cref="Resource{T}.Value"/>, <see cref="Resource{T}.IsLoading"/> or
+    /// <see cref="Resource{T}.Error"/> change, if it read them.
+    /// </summary>
+    /// <remarks>Disposal follows the same rules as <see cref="Effect"/>.</remarks>
+    /// <param name="source">Tracked; when what it read changes and its value differs, the resource refetches.</param>
+    /// <param name="fetch">Loads the value for a source value; reads inside it are not tracked.</param>
+    protected Resource<T> Resource<TSource, T>(Func<TSource> source, Func<TSource, CancellationToken, Task<T>> fetch)
+        => Own(Reactive.Resource(source, fetch));
+
+    /// <summary>
+    /// Component-owned form of <see cref="Reactive.Resource{T}"/>: fetches once (and on
+    /// <see cref="Resource{T}.Reload"/>), and is disposed together with the component.
+    /// </summary>
+    /// <param name="fetch">Loads the value; reads inside it are not tracked.</param>
+    protected Resource<T> Resource<T>(Func<CancellationToken, Task<T>> fetch) => Own(Reactive.Resource(fetch));
+
+    private TOwned Own<TOwned>(TOwned owned)
+        where TOwned : IDisposable
+    {
+        // The private observer guards _owned: it never locks itself, and a dedicated Lock would cost every
+        // component an allocation even when it owns nothing.
         lock (_observer)
         {
             if (!_disposed)
             {
-                (_effects ??= []).Add(effect);
+                (_owned ??= []).Add(owned);
 
-                return effect;
+                return owned;
             }
         }
 
-        effect.Dispose();
+        owned.Dispose();
 
-        return effect;
+        return owned;
     }
 
     private protected abstract void BuildTrackedRenderTree(RenderTreeBuilder builder);
@@ -192,21 +212,21 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         _disposed = true;
         _observer.Dispose();
 
-        List<ReactiveEffect>? effects;
+        List<IDisposable>? owned;
         lock (_observer)
         {
-            effects = _effects;
-            _effects = null;
+            owned = _owned;
+            _owned = null;
         }
 
-        if (effects is null)
+        if (owned is null)
         {
             return;
         }
 
-        foreach (var effect in effects)
+        foreach (var disposable in owned)
         {
-            effect.Dispose();
+            disposable.Dispose();
         }
     }
 

@@ -235,6 +235,43 @@ effect.Dispose();
 
 An effect runs once immediately and again, on the thread pool, after each change. Effects may write reactive state. UI work inside a component effect should go through `InvokeAsync`.
 
+### Loading data
+
+`Resource` loads data asynchronously and exposes its state reactively. The first function (the source) is tracked; when its value changes, the in-flight fetch is cancelled and a new one starts:
+
+```razor
+@inject ProductState State
+@inject ProductApi Api
+
+@if (_product.IsLoading)
+{
+    <p>Loading…</p>
+}
+else if (_product.Error is not null)
+{
+    <p>Failed: @_product.Error.Message</p>
+}
+else
+{
+    <h2>@_product.Value?.Name</h2>
+}
+
+@code {
+    private Resource<Product> _product = null!;
+
+    protected override void OnInitialized()
+    {
+        _product = Resource(() => State.SelectedId, (id, ct) => Api.GetAsync(id, ct));
+    }
+}
+```
+
+- **What it exposes:** `Value`, `HasValue`, `IsLoading` and `Error` are reactive, so the component re-renders when they change. `Value` keeps the last result while a new fetch runs, and a fetch that fails sets `Error` but keeps the previous `Value`.
+- **Fetch reads:** reactive state read inside the fetch is not tracked; only the source is.
+- **Stale results:** a slow, outdated fetch never overwrites a newer result.
+- **Fetch once:** `Resource(ct => Api.GetAllAsync(ct))` has no source and fetches once. Call `Reload()` to fetch again.
+- **Outside components:** use `Reactive.Resource(...)` and dispose it yourself. `WhenSettled` completes when no fetch is in flight.
+
 ### Changes Wick can't see
 
 If state was mutated behind Wick's back (a mutable object from a library, a `List<T>` you can't replace), tell the readers explicitly:
@@ -306,7 +343,7 @@ public async Task Shows_the_new_count()
 }
 ```
 
-It waits for the whole process, so tests running in parallel can delay it, but never make it return early.
+It waits for the whole process, so tests running in parallel can delay it, but never make it return early. It does not wait for `Resource` fetches, because a fetch can take arbitrarily long; complete your fake fetch, or await `resource.WhenSettled`, then call `WhenIdleAsync()` for the re-render.
 
 ## Diagnostics
 

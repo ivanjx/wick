@@ -1,0 +1,24 @@
+@* Owns a resource keyed by Count; each fetch waits for the test to complete it. *@
+@inherits ReactiveComponentBase
+@using Wick.Core
+@inject AppState State
+<p>@(_resource.IsLoading ? "loading" : _resource.Value)</p>
+
+@code {
+    private Resource<string> _resource = null!;
+
+    public List<(int Count, TaskCompletionSource<string> Result, CancellationToken Token)> Fetches { get; } = [];
+
+    protected override void OnInitialized() => _resource = Resource(() => State.Count, Fetch);
+
+    private Task<string> Fetch(int count, CancellationToken token)
+    {
+        var result = new TaskCompletionSource<string>();
+        lock (Fetches)
+        {
+            Fetches.Add((count, result, token));
+        }
+
+        return result.Task;
+    }
+}
