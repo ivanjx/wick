@@ -7,8 +7,9 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <!-- Packed inside Wick.Core under analyzers/dotnet/cs. -->
+    <!-- Packed inside Wick.Core under analyzers/dotnet/cs; the compiler loads it, so it ships no XML docs. -->
     <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

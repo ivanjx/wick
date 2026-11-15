@@ -12,6 +12,15 @@
     <PackageTags>blazor;reactive;state;signals</PackageTags>
   </PropertyGroup>
 
+  <!-- Ship XML docs (IntelliSense) and a symbol package (debugging into Wick). Not every member is documented, so CS1591 is off. -->
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)../README.md" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>
