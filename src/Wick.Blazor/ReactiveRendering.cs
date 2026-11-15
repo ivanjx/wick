@@ -18,9 +18,10 @@ namespace Wick.Blazor;
 public static class ReactiveRendering
 {
     /// <summary>
-    /// Completes once no reactive re-render and no <see cref="ReactiveEffect"/> re-run is scheduled or running. Work
-    /// that this work starts in turn, such as an effect writing state that another component renders, is awaited as
-    /// well; the task completes only when the whole chain has finished.
+    /// Completes once no reactive re-render and no <see cref="ReactiveEffect"/> re-run is scheduled or running; an
+    /// asynchronous effect's run, including its first one, counts until its task completes. Work that this work starts
+    /// in turn, such as an effect writing state that another component renders, is awaited as well; the task completes
+    /// only when the whole chain has finished.
     /// </summary>
     /// <remarks>
     /// <para>

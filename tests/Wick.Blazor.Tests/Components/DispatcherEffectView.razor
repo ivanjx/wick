@@ -1,0 +1,34 @@
+@* Owns a synchronous and an asynchronous effect that log whether their runs execute on the renderer's dispatcher. *@
+@inherits ReactiveComponentBase
+@using System.Collections.Concurrent
+@inject AppState State
+@inject RenderProbe Probe
+<p>dispatcher effects</p>
+
+@code {
+    private readonly ConcurrentQueue<string> _log = new();
+    private CancellationToken _lastToken;
+
+    public string[] Log => [.. _log];
+
+    public CancellationToken LastToken => _lastToken;
+
+    protected override void OnInitialized()
+    {
+        Effect(() => _log.Enqueue($"sync {State.Count} {OnDispatcher()}"));
+
+        Effect(async token =>
+        {
+            var count = State.Count;
+            _lastToken = token;
+            _log.Enqueue($"async {count} {OnDispatcher()}");
+
+            // Count 2 holds the run open until it is cancelled.
+            await Task.Delay(count == 2 ? Timeout.Infinite : 10, token);
+
+            _log.Enqueue($"after {count} {OnDispatcher()}");
+        });
+    }
+
+    private bool OnDispatcher() => Probe.Dispatcher!.CheckAccess();
+}

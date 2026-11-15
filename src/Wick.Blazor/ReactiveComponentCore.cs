@@ -42,11 +42,10 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     }
 
     /// <summary>
-    /// Component-owned form of <see cref="Reactive.Effect"/>: the effect is disposed together with the component,
-    /// so it needs no cleanup in <see cref="Dispose(bool)"/>. Like <see cref="Reactive.Effect"/>, it runs once
-    /// immediately on the calling thread and re-runs on the thread pool whenever reactive state it read changes;
-    /// UI work inside it, such as <see cref="ComponentBase.StateHasChanged"/>, should go through
-    /// <see cref="ComponentBase.InvokeAsync(Action)"/>.
+    /// Component-owned form of <see cref="Reactive.Effect(Action, Action{Exception}?, Func{Func{Task}, Task}?)"/>: the
+    /// effect is disposed together with the component, so it needs no cleanup in <see cref="Dispose(bool)"/>. It runs
+    /// once immediately on the calling thread and re-runs on the component's dispatcher whenever reactive state it read
+    /// changes, so UI work inside it, such as JavaScript interop, needs no <see cref="ComponentBase.InvokeAsync(Action)"/>.
     /// </summary>
     /// <remarks>
     /// The returned effect may be disposed early; disposing it again with the component is harmless. Calling this
@@ -55,8 +54,33 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     /// never re-runs. Safe to call from any thread.
     /// </remarks>
     /// <param name="run">The side effect; reactive state it reads becomes its dependencies.</param>
-    /// <param name="onError">Receives exceptions thrown by runs; see <see cref="Reactive.Effect"/>.</param>
-    protected ReactiveEffect Effect(Action run, Action<Exception>? onError = null) => Own(Reactive.Effect(run, onError));
+    /// <param name="onError">Receives exceptions thrown by runs; see <see cref="Reactive.Effect(Action, Action{Exception}?, Func{Func{Task}, Task}?)"/>.</param>
+    protected ReactiveEffect Effect(Action run, Action<Exception>? onError = null) => Own(Reactive.Effect(run, onError, InvokeAsync));
+
+    /// <summary>
+    /// Component-owned form of <see cref="Reactive.Effect(Func{CancellationToken, Task}, Action{Exception}?, Func{Func{Task}, Task}?)"/>:
+    /// an asynchronous effect whose re-runs start on the component's dispatcher, so the run and its awaits continue
+    /// there and may call JavaScript interop directly:
+    /// <code>
+    /// Effect(async token => await JS.InvokeVoidAsync("setTheme", token, Settings.Theme));
+    /// </code>
+    /// Only reads before the first incomplete <c>await</c> are tracked. A change during a run cancels its token and the
+    /// next run follows once it completed. Disposing the component cancels the run in progress.
+    /// </summary>
+    /// <remarks>
+    /// The first run starts on the calling thread, normally the dispatcher in <c>OnInitialized</c>. Disposal follows
+    /// the same rules as the synchronous overload.
+    /// </remarks>
+    /// <param name="run">The side effect, with a token cancelled when the run is superseded or the component disposed.</param>
+    /// <param name="onError">Receives failures of runs; the outcome of a cancelled run is never reported.</param>
+    protected ReactiveEffect Effect(Func<CancellationToken, Task> run, Action<Exception>? onError = null)
+        => Own(Reactive.Effect(run, onError, InvokeAsync));
+
+    /// <summary>
+    /// Asynchronous component-owned effect that does not need a cancellation token; see
+    /// <see cref="Effect(Func{CancellationToken, Task}, Action{Exception}?)"/>.
+    /// </summary>
+    protected ReactiveEffect Effect(Func<Task> run, Action<Exception>? onError = null) => Own(Reactive.Effect(run, onError, InvokeAsync));
 
     private TOwned Own<TOwned>(TOwned owned)
         where TOwned : IDisposable

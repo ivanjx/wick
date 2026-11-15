@@ -132,7 +132,40 @@ public sealed class ComponentEffectTests : ReactiveTestContext
         Assert.Equal(0, State.ObserversOf(nameof(AppState.Count)));
     }
 
-    /// <summary>Effects re-run on the thread pool, so give a run that should not happen time to show up.</summary>
+    [Fact]
+    public void Effects_re_run_on_the_component_dispatcher_and_async_runs_continue_there()
+    {
+        var view = Render<DispatcherEffectView>().Instance;
+
+        Assert.True(SpinWait.SpinUntil(() => view.Log.Contains("after 0 True"), Timeout));
+
+        State.Count = 1;
+
+        Assert.True(SpinWait.SpinUntil(() => view.Log.Contains("after 1 True"), Timeout));
+        Assert.Contains("sync 0 True", view.Log);
+        Assert.Contains("sync 1 True", view.Log);
+        Assert.Contains("async 1 True", view.Log);
+        Assert.DoesNotContain(view.Log, entry => entry.EndsWith("False", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Removing_the_component_cancels_its_async_effect_run()
+    {
+        var host = Render<ToggleHost>(parameters => parameters.AddChildContent<DispatcherEffectView>());
+        var view = host.FindComponent<DispatcherEffectView>().Instance;
+
+        State.Count = 2;
+
+        Assert.True(SpinWait.SpinUntil(() => view.Log.Contains("async 2 True"), Timeout));
+        Assert.False(view.LastToken.IsCancellationRequested);
+
+        host.Render(parameters => parameters.Add(p => p.Show, false));
+
+        Assert.True(view.LastToken.IsCancellationRequested);
+        Assert.DoesNotContain("after 2 True", view.Log);
+    }
+
+    /// <summary>Effects re-run asynchronously, so give a run that should not happen time to show up.</summary>
     private static void AssertNoMoreRuns(Func<int> runs, int expected)
     {
         Thread.Sleep(Quiet);

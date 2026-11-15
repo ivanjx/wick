@@ -264,7 +264,30 @@ var effect = Reactive.Effect(() => logger.LogInformation("Filter is now {Filter}
 effect.Dispose();
 ```
 
-An effect runs once immediately and again, on the thread pool, after each change. Effects may write reactive state. UI work inside a component effect should go through `InvokeAsync`.
+An effect runs once immediately and again after each change. Effects may write reactive state. A component effect re-runs on the component's dispatcher, so it can update the UI or call JavaScript directly; `Reactive.Effect` re-runs on the thread pool, or through the `dispatcher` you pass it.
+
+#### Async effects
+
+Pass an `async` function to run asynchronous work, such as a search or JavaScript interop:
+
+```csharp
+protected override void OnInitialized()
+{
+    Effect(async token =>
+    {
+        var query = State.Query;
+        var results = await Api.SearchAsync(query, token);
+        State.Results = results;
+    });
+}
+```
+
+- **Tracking:** only reads made before the first `await` are tracked. Read the state you depend on first.
+- **One run at a time:** a change during a run cancels its `token`, and the next run starts once the current one has finished. A slow, outdated run can't overwrite a newer result, provided it observes its token.
+- **Errors:** failures go to `onError`, or to `Reactive.UnhandledEffectException`. A cancelled run's outcome is never reported.
+- **Where it runs:** in a component, re-runs start on the component's dispatcher and their awaits resume there. Disposing the effect, or the component that owns it, cancels the run in progress.
+
+`samples/Wick.Sample` has a search page built this way.
 
 ### Changes Wick can't see
 
@@ -337,7 +360,7 @@ public async Task Shows_the_new_count()
 }
 ```
 
-It waits for the whole process, so tests running in parallel can delay it, but never make it return early.
+It waits for the whole process, so tests running in parallel can delay it, but never make it return early. It also waits for async effect runs until they complete, so make sure fake APIs used by an effect eventually return.
 
 ## Diagnostics
 

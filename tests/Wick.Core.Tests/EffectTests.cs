@@ -101,7 +101,7 @@ public sealed class EffectTests
     {
         var state = new AppState();
 
-        Assert.Throws<InvalidOperationException>(() => Reactive.Effect(() => throw new InvalidOperationException()));
+        Assert.Throws<InvalidOperationException>(() => Reactive.Effect(Fail));
 
         Exception? reported = null;
         using var effect = Reactive.Effect(
@@ -157,6 +157,9 @@ public sealed class EffectTests
         Assert.Equal(0, effect.DependencyCount);
         Assert.Equal(0, state.Node(nameof(AppState.Count))!.ObserverCount);
     }
+
+    // A method group: a lambda that only throws would bind to the asynchronous Func<Task> overload.
+    private static void Fail() => throw new InvalidOperationException();
 
     private static void WaitUntil(Func<bool> condition) => Assert.True(SpinWait.SpinUntil(condition, Timeout), "Timed out waiting for the effect.");
 

@@ -5,8 +5,9 @@ namespace Wick.Core;
 public static class Reactive
 {
     /// <summary>
-    /// Raised when a <see cref="ReactiveEffect"/> created without an error handler throws while re-running.
-    /// Without a subscriber the exception is written to <see cref="Trace"/>; it is never rethrown on the thread pool.
+    /// Raised when a <see cref="ReactiveEffect"/> created without an error handler fails while re-running, or an
+    /// asynchronous one fails at all. Without a subscriber the exception is written to <see cref="Trace"/>; it is never
+    /// rethrown on the thread pool.
     /// </summary>
     public static event Action<Exception>? UnhandledEffectException;
 
@@ -99,18 +100,66 @@ public static class Reactive
 
     /// <summary>
     /// Runs <paramref name="effect"/> now and again whenever reactive state it read changes, until disposed.
-    /// The first run is synchronous on the calling thread; re-runs happen on the thread pool, coalesced.
+    /// The first run is synchronous on the calling thread; re-runs happen on the thread pool, or through
+    /// <paramref name="dispatcher"/>, coalesced.
     /// </summary>
     /// <param name="effect">The code to run; it may write reactive state, and its writes are batched per run.</param>
     /// <param name="onError">
     /// Receives exceptions thrown by any run. Without it, the first run's exception propagates to the caller and
     /// later ones are reported through <see cref="UnhandledEffectException"/>.
     /// </param>
-    public static ReactiveEffect Effect(Action effect, Action<Exception>? onError = null)
+    /// <param name="dispatcher">
+    /// Runs each re-run where it must happen, for example a Blazor component's <c>InvokeAsync</c> or a UI thread's
+    /// dispatcher: it receives a function that performs the run and returns once that run has ended.
+    /// </param>
+    public static ReactiveEffect Effect(Action effect, Action<Exception>? onError = null, Func<Func<Task>, Task>? dispatcher = null)
     {
         ArgumentNullException.ThrowIfNull(effect);
 
-        return ReactiveEffect.Start(effect, onError);
+        return SyncReactiveEffect.Start(effect, onError, dispatcher);
+    }
+
+    /// <summary>
+    /// Runs the asynchronous <paramref name="effect"/> now and again whenever reactive state it read before its first
+    /// incomplete <c>await</c> changes, until disposed. Reads after that point are not tracked.
+    /// </summary>
+    /// <remarks>
+    /// Runs never overlap. A change arriving during a run cancels the run's token, and the next run starts once the
+    /// current one has completed; changes arriving meanwhile coalesce into that one run. A slow run therefore cannot
+    /// overwrite the writes of a newer one, as long as it observes its token. The first run starts on the calling
+    /// thread; later runs start on the thread pool, or through <paramref name="dispatcher"/>, and continue wherever
+    /// their awaits resume. Disposing the effect cancels the run in progress.
+    /// </remarks>
+    /// <param name="effect">
+    /// The code to run, with a token cancelled when the run is superseded or the effect is disposed. It may write
+    /// reactive state; the writes of its synchronous part are batched.
+    /// </param>
+    /// <param name="onError">
+    /// Receives the failures of runs, including a cancellation the effect did not request; without it they are reported
+    /// through <see cref="UnhandledEffectException"/>. The outcome of a cancelled run is never reported.
+    /// </param>
+    /// <param name="dispatcher">
+    /// Starts each re-run where it must happen, for example a Blazor component's <c>InvokeAsync</c>, so that the run
+    /// and its awaits continue on that dispatcher: it receives a function that starts the run and returns once the
+    /// synchronous part of the run has ended.
+    /// </param>
+    public static ReactiveEffect Effect(Func<CancellationToken, Task> effect, Action<Exception>? onError = null, Func<Func<Task>, Task>? dispatcher = null)
+    {
+        ArgumentNullException.ThrowIfNull(effect);
+
+        return AsyncReactiveEffect.Start(effect, onError, dispatcher);
+    }
+
+    /// <summary>
+    /// Asynchronous effect that does not need a cancellation token; see
+    /// <see cref="Effect(Func{CancellationToken, Task}, Action{Exception}?, Func{Func{Task}, Task}?)"/>. Also keeps an
+    /// <c>async () =&gt;</c> lambda from becoming an <c>async void</c> synchronous effect.
+    /// </summary>
+    public static ReactiveEffect Effect(Func<Task> effect, Action<Exception>? onError = null, Func<Func<Task>, Task>? dispatcher = null)
+    {
+        ArgumentNullException.ThrowIfNull(effect);
+
+        return AsyncReactiveEffect.Start(_ => effect(), onError, dispatcher);
     }
 
     internal static void ReportUnhandledEffectException(Exception exception)
