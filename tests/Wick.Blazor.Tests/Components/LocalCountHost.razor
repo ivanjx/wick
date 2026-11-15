@@ -1,0 +1,17 @@
+@inherits ReactiveComponentBase
+@using Wick.Core
+@{
+    Renders++;
+}
+<LocalCountView Count="Count" />
+<button id="increment" @onclick="Increment">+</button>
+
+@code {
+    // Owned here but never read here: only the child that reads it re-renders when it changes.
+    public ReactiveValue<int> Count { get; } = new(0);
+
+    // bUnit's RenderCount also counts renders of descendants.
+    public int Renders { get; private set; }
+
+    private void Increment() => Count.Value++;
+}

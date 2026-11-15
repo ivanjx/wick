@@ -182,6 +182,35 @@ public sealed class ReactiveStateGeneratorTests
         Assert.Empty(run.Compilation);
     }
 
+    [Fact]
+    public void Properties_assigned_by_Blazor_do_not_warn_in_a_reactive_component()
+    {
+        var run = GeneratorRunner.Run(
+            """
+            using Microsoft.AspNetCore.Components;
+            using Wick.Core;
+
+            namespace Microsoft.AspNetCore.Components
+            {
+                public sealed class ParameterAttribute : System.Attribute { }
+
+                public sealed class InjectAttribute : System.Attribute { }
+            }
+
+            [ReactiveState]
+            public partial class Counter
+            {
+                [Parameter] public int Step { get; set; }
+
+                [Inject] public System.IServiceProvider Services { get; set; } = null!;
+
+                public partial int Count { get; set; }
+            }
+            """);
+
+        Assert.True(run.Reported.IsEmpty && run.Compilation.IsEmpty, run.Describe());
+    }
+
     [Theory]
     [InlineData("List<int>")]
     [InlineData("IList<int>")]

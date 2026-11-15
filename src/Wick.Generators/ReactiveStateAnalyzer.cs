@@ -15,6 +15,7 @@ public sealed class ReactiveStateAnalyzer : DiagnosticAnalyzer
 {
     private const string AttributeMetadataName = "Wick.Core.ReactiveStateAttribute";
     private const string GeneratedFileSuffix = ".ReactiveState.g.cs";
+    private const string BlazorNamespace = "Microsoft.AspNetCore.Components";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
         [Diagnostics.AutoPropertyIsNotReactive, Diagnostics.MutableCollectionProperty];
@@ -55,7 +56,7 @@ public sealed class ReactiveStateAnalyzer : DiagnosticAnalyzer
 
             if (!property.IsPartialDefinition)
             {
-                if (IsWritableAutoProperty(property, syntax))
+                if (IsWritableAutoProperty(property, syntax) && !IsSetByBlazor(property))
                 {
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.AutoPropertyIsNotReactive, location, property.Name));
                 }
@@ -82,6 +83,11 @@ public sealed class ReactiveStateAnalyzer : DiagnosticAnalyzer
            && !property.SetMethod.IsInitOnly
            && syntax.AccessorList is not null
            && syntax.AccessorList.Accessors.All(accessor => accessor.Body is null && accessor.ExpressionBody is null);
+
+    // A [ReactiveState] component's [Parameter], [CascadingParameter], [Inject] and [SupplyParameterFrom...]
+    // properties are assigned by Blazor, which re-renders the component afterwards; they need no tracking.
+    private static bool IsSetByBlazor(IPropertySymbol property)
+        => property.GetAttributes().Any(attribute => attribute.AttributeClass?.ContainingNamespace?.ToDisplayString() == BlazorNamespace);
 
     // Hand-written implementations of partial properties are not reactive unless their author made them so.
     private static bool IsGenerated(IPropertySymbol property)

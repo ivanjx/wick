@@ -1,0 +1,12 @@
+@inherits ReactiveComponentBase
+@using Wick.Core
+@inject RenderProbe Probe
+@{
+    using var probe = Probe.Render();
+}
+<p id="count">@Count.Value</p>
+
+@code {
+    [Parameter, EditorRequired]
+    public ReactiveValue<int> Count { get; set; } = null!;
+}

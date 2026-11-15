@@ -178,6 +178,34 @@ All three are thread-safe, and enumerating them while another thread writes is s
 
 Arrays are fine as long as you replace them (`Cells = [.. cells]`). Writing one element in place (`State.Cells[i] = x`) is not tracked, and the compiler warns about it.
 
+### Local component state
+
+State that belongs to one component doesn't need a service. In a `@code` block, use `ReactiveValue<T>`; the source generator can't see partial properties declared in a `.razor` file:
+
+```razor
+<p>@_count.Value</p>
+<button @onclick="() => _count.Value++">+</button>
+
+@code {
+    private readonly ReactiveValue<int> _count = new(0);
+}
+```
+
+A write from any thread (a timer, a callback after an `await`) re-renders the component without `InvokeAsync` or `StateHasChanged`. Pass the value to a child component (`<CountDisplay Count="_count" />`) and only the child that reads `Count.Value` re-renders when it changes; the parent doesn't. The reactive collections and `Reactive.Derived` work as component fields too. The optional second argument names the value in [diagnostics](#why-did-this-re-render): `new(0, "Counter.Count")`.
+
+In a code-behind file, the component itself can be a `[ReactiveState]` type. Properties set by Blazor (`[Parameter]`, `[CascadingParameter]`, `[Inject]`, `[SupplyParameterFrom...]`) stay plain auto-properties:
+
+```csharp
+[ReactiveState]
+public partial class Counter
+{
+    [Parameter]
+    public int Step { get; set; } = 1;
+
+    public partial int Count { get; set; }
+}
+```
+
 ### Batching
 
 Several writes that belong together can be grouped so readers re-render once:
