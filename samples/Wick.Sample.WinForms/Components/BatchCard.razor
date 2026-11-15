@@ -1,0 +1,14 @@
+@inject CounterState State
+
+<div class="card" id="batch-card">
+    <h2>Batch <RenderCount Value="++_renders" /></h2>
+    <div class="big">@State.Left / @State.Right</div>
+    <div class="row">
+        <button id="batch" @onclick="State.BumpBoth">Update both</button>
+    </div>
+    <p class="hint"><code>Reactive.Batch</code> writes two properties; this card renders once per click, and the native label's effect runs once.</p>
+</div>
+
+@code {
+    private int _renders;
+}

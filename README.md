@@ -409,6 +409,12 @@ Then open http://localhost:5080. Pages include a counter written from several th
 dotnet run --project samples/Wick.Sample.Wasm
 ```
 
+`samples/Wick.Sample.WinForms` is a Blazor Hybrid app for Windows: native WinForms controls next to a `BlazorWebView`, both over the same state. The Blazor cards re-render through Wick; the native labels are set by `Reactive.Effect`s that marshal to the UI thread. Click either side and both update.
+
+```sh
+dotnet run --project samples/Wick.Sample.WinForms
+```
+
 ## Repository layout
 
 | Path | Contents |
@@ -421,6 +427,7 @@ dotnet run --project samples/Wick.Sample.Wasm
 | `tests/Wick.E2E.*` | Browser end-to-end tests: a Blazor Web App host driven by Playwright in Interactive Server and WebAssembly modes |
 | `samples/Wick.Sample` | Interactive Server demo app |
 | `samples/Wick.Sample.Wasm` | WebAssembly demo app |
+| `samples/Wick.Sample.WinForms` | Blazor Hybrid (WinForms) demo app |
 | `benchmarks/Wick.Benchmarks` | BenchmarkDotNet benchmarks, including a grid render comparison with the classic event pattern |
 
 Build and test:

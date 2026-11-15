@@ -5,6 +5,7 @@
   <Folder Name="/samples/">
     <Project Path="samples/Wick.Sample/Wick.Sample.csproj" />
     <Project Path="samples/Wick.Sample.Wasm/Wick.Sample.Wasm.csproj" />
+    <Project Path="samples/Wick.Sample.WinForms/Wick.Sample.WinForms.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Wick.Blazor/Wick.Blazor.csproj" />

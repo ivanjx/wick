@@ -1,0 +1,20 @@
+@inject CounterState State
+@inject LogState Log
+
+<div class="card" id="log-card">
+    <h2>Effect log <RenderCount Value="++_renders" /></h2>
+    <ul class="log">
+        @foreach (var entry in Log.Entries)
+        {
+            <li>@entry</li>
+        }
+    </ul>
+    <p class="hint">A component-owned <code>Effect</code> reads <code>Count</code> and <code>Left</code> and appends to a capped <code>ReactiveList</code>.</p>
+</div>
+
+@code {
+    private int _renders;
+
+    protected override void OnInitialized() =>
+        Effect(() => Log.Add($"count={State.Count} left={State.Left} (thread {Environment.CurrentManagedThreadId})"));
+}

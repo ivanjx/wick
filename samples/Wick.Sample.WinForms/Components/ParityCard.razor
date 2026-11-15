@@ -1,0 +1,27 @@
+@inject CounterState State
+
+<div class="card" id="parity-card">
+    <h2>Derived <RenderCount Value="++_renders" /></h2>
+    <div class="big">@_parity.Value</div>
+    <p class="hint">
+        <code>Reactive.Derived</code> over <code>Count</code>: it notifies only when the parity flips, which happens
+        on every increment by one; the derived value is cached between reads.
+    </p>
+</div>
+
+@code {
+    private Derived<string> _parity = null!;
+    private int _renders;
+
+    protected override void OnInitialized() => _parity = Reactive.Derived(() => State.Count % 2 == 0 ? "even" : "odd");
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _parity.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+}
