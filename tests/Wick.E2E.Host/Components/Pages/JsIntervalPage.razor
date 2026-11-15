@@ -1,0 +1,8 @@
+@page "/js-interval/{Mode}"
+<JsIntervalView @rendermode="RenderModes.Get(Mode)" />
+<PlainJsIntervalView @rendermode="RenderModes.Get(Mode)" />
+
+@code {
+    [Parameter]
+    public string Mode { get; set; } = "";
+}

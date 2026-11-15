@@ -1,0 +1,24 @@
+@* Control: the same setInterval with a plain field and no StateHasChanged never updates the page. *@
+@inherits ComponentBase
+@implements IDisposable
+@inject IJSRuntime JS
+<p id="plain-ticks">@_ticks</p>
+
+@code {
+    private int _ticks;
+    private DotNetObjectReference<PlainJsIntervalView>? _self;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("wickE2E.startInterval", _self, "plain", 20);
+        }
+    }
+
+    [JSInvokable]
+    public void Tick() => _ticks++;
+
+    public void Dispose() => _self?.Dispose();
+}

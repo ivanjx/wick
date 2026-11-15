@@ -1,0 +1,32 @@
+@* Local state written by a JS setInterval through [JSInvokable]. *@
+@inherits ReactiveComponentBase
+@inject IJSRuntime JS
+<p id="wick-ticks">@_ticks.Value</p>
+
+@code {
+    private readonly ReactiveValue<int> _ticks = new(0);
+    private DotNetObjectReference<JsIntervalView>? _self;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("wickE2E.startInterval", _self, "wick", 20);
+        }
+    }
+
+    // Blazor does not re-render after a call from JS; the reactive write does.
+    [JSInvokable]
+    public void Tick() => _ticks.Value++;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _self?.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+}

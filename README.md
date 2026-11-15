@@ -418,6 +418,7 @@ dotnet run --project samples/Wick.Sample.Wasm
 | `src/Wick.Generators` | Source generator for `[ReactiveState]` and the analyzers |
 | `src/Wick.CodeFixes` | IDE quick fixes for the analyzer warnings |
 | `tests/` | Unit, generator and bUnit component tests |
+| `tests/Wick.E2E.*` | Browser end-to-end tests: a Blazor Web App host driven by Playwright in Interactive Server and WebAssembly modes |
 | `samples/Wick.Sample` | Interactive Server demo app |
 | `samples/Wick.Sample.Wasm` | WebAssembly demo app |
 | `benchmarks/Wick.Benchmarks` | BenchmarkDotNet benchmarks, including a grid render comparison with the classic event pattern |
@@ -427,6 +428,12 @@ Build and test:
 ```sh
 dotnet build Wick.slnx
 dotnet test --solution Wick.slnx
+```
+
+The end-to-end tests drive the browser already installed on the machine (Edge on Windows, Chrome elsewhere), so Playwright doesn't download one. To run only them:
+
+```sh
+dotnet test --project tests/Wick.E2E.Tests
 ```
 
 ## License

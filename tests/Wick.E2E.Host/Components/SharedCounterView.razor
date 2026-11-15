@@ -1,0 +1,8 @@
+@inherits ReactiveComponentBase
+@inject SharedCounter Counter
+<p id="count">@Counter.Count</p>
+<button id="increment" @onclick="Increment">+</button>
+
+@code {
+    private void Increment() => Counter.Count++;
+}

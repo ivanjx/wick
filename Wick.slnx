@@ -15,6 +15,9 @@
   <Folder Name="/tests/">
     <Project Path="tests/Wick.Blazor.Tests/Wick.Blazor.Tests.csproj" />
     <Project Path="tests/Wick.Core.Tests/Wick.Core.Tests.csproj" />
+    <Project Path="tests/Wick.E2E.Client/Wick.E2E.Client.csproj" />
+    <Project Path="tests/Wick.E2E.Host/Wick.E2E.Host.csproj" />
+    <Project Path="tests/Wick.E2E.Tests/Wick.E2E.Tests.csproj" />
     <Project Path="tests/Wick.Generators.Tests/Wick.Generators.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,0 +1,7 @@
+@page "/timer/{Mode}"
+<TimerView @rendermode="RenderModes.Get(Mode)" />
+
+@code {
+    [Parameter]
+    public string Mode { get; set; } = "";
+}
