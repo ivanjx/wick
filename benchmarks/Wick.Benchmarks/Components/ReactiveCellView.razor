@@ -1,0 +1,10 @@
+@inherits ReactiveComponentBase
+
+<div class="cell">
+    <span>@Cell.Value</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public GridCell Cell { get; set; } = default!;
+}

@@ -122,6 +122,25 @@ builder.Services.AddSingleton<MarketState>(); // shared by everyone
 
 Re-renders are coalesced: a thousand writes in a row cause a handful of renders, not a thousand.
 
+## Performance
+
+One cell of a rendered grid changes. In the traditional version, the grid subscribes to each cell's change event and calls `InvokeAsync(StateHasChanged)`, the same pattern shown in [Why](#why). With Wick, each cell component just reads `@Cell.Value`. The time is measured from the write until rendering has finished.
+
+| Cells | Approach | Components re-rendered | Time per update | Allocated |
+|------:|----------|-----------------------:|----------------:|----------:|
+| 100 | Traditional | 101 | 23.5 μs | 3,264 B |
+| 100 | Wick | 1 | 1.5 μs | 168 B |
+| 400 | Traditional | 401 | 89.4 μs | 12,864 B |
+| 400 | Wick | 1 | 1.5 μs | 160 B |
+
+The traditional version gets slower as the grid grows; Wick's cost stays flat, because only the changed cell re-renders. Wick's time includes its hop to the thread pool.
+
+Measured with BenchmarkDotNet using a headless Blazor `Renderer`, so browser and network time are not included. Absolute numbers depend on the machine. To reproduce:
+
+```sh
+dotnet run -c Release --project benchmarks/Wick.Benchmarks -- --filter '*GridRender*'
+```
+
 ## Guide
 
 ### Computed properties
@@ -264,15 +283,21 @@ protected override void Dispose(bool disposing)
 
 Warnings can be suppressed with `#pragma warning disable` or in `.editorconfig`.
 
-## Sample app
+## Sample apps
 
-`samples/Wick.Sample` shows every feature, with render counters on each component so you can see exactly what re-renders:
+`samples/Wick.Sample` (Interactive Server) shows every feature, with render counters on each component so you can see exactly what re-renders:
 
 ```sh
 dotnet run --project samples/Wick.Sample
 ```
 
 Then open http://localhost:5080. Pages include a counter written from several threads, a 400-cell grid next to the classic event pattern, a live market fed by a background service, nested state, a todo list, and reactive regions.
+
+`samples/Wick.Sample.Wasm` is a smaller WebAssembly app: a background loop, a derived value, a component-owned effect and a batch, all on the browser's single thread.
+
+```sh
+dotnet run --project samples/Wick.Sample.Wasm
+```
 
 ## Repository layout
 
@@ -283,6 +308,8 @@ Then open http://localhost:5080. Pages include a counter written from several th
 | `src/Wick.Generators` | Source generator for `[ReactiveState]` and the analyzers |
 | `tests/` | Unit, generator and bUnit component tests |
 | `samples/Wick.Sample` | Interactive Server demo app |
+| `samples/Wick.Sample.Wasm` | WebAssembly demo app |
+| `benchmarks/Wick.Benchmarks` | BenchmarkDotNet benchmarks, including a grid render comparison with the classic event pattern |
 
 Build and test:
 

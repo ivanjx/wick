@@ -1,0 +1,17 @@
+@inject CounterState State
+
+<div class="card" id="count-card">
+    <h2>Counter <RenderCount Value="++_renders" /></h2>
+    <div class="big">@State.Count</div>
+    <div class="row">
+        <button id="increment" @onclick="State.Increment">Increment</button>
+        <button id="toggle" class="secondary" @onclick="() => State.Ticking = !State.Ticking">
+            @(State.Ticking ? "Pause loop" : "Resume loop")
+        </button>
+    </div>
+    <p class="hint">A <code>Task.Run</code> loop adds 1 every second.</p>
+</div>
+
+@code {
+    private int _renders;
+}

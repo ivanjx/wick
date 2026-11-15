@@ -1,0 +1,106 @@
+body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    color: #1d2433;
+    background: #f6f7fb;
+}
+
+header {
+    padding: .75rem 1.5rem;
+    background: #4f5bd5;
+    color: #fff;
+    font-weight: 600;
+}
+
+main {
+    padding: 1.5rem;
+}
+
+h1 {
+    margin: 0 0 .25rem;
+    font-size: 1.5rem;
+}
+
+h1:focus {
+    outline: none;
+}
+
+h2 {
+    margin: 0 0 .75rem;
+    font-size: 1.1rem;
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+}
+
+p.lead, .hint {
+    color: #64708a;
+}
+
+code {
+    background: #e8ecf7;
+    padding: 0 .3em;
+    border-radius: 4px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: 1rem;
+}
+
+.card {
+    background: #fff;
+    border: 1px solid #dfe3ec;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.big {
+    font-size: 2.2rem;
+    font-weight: 600;
+}
+
+.row {
+    display: flex;
+    gap: .5rem;
+    margin: .5rem 0;
+}
+
+button {
+    border: 0;
+    border-radius: 6px;
+    padding: .4rem .8rem;
+    background: #4f5bd5;
+    color: #fff;
+    cursor: pointer;
+}
+
+button.secondary {
+    background: #e8ecf7;
+    color: #1d2433;
+}
+
+.log {
+    margin: 0;
+    padding-left: 1.2rem;
+    font-family: Consolas, monospace;
+    font-size: .85rem;
+}
+
+.render-count {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 0 .4em;
+    border-radius: 999px;
+    background: #e8ecf7;
+    font-size: .75rem;
+    text-align: center;
+    animation: flash .6s ease-out;
+}
+
+@keyframes flash {
+    from {
+        background: #ffcf4d;
+    }
+}

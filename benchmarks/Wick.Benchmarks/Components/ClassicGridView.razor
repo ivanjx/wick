@@ -1,0 +1,34 @@
+@* The conventional pattern, as in the sample: subscribe to change events and re-render the container. *@
+@inherits ComponentBase
+@implements IDisposable
+
+<div class="grid">
+    @foreach (var cell in Cells)
+    {
+        <ClassicCellView Cell="cell" />
+    }
+</div>
+
+@code {
+    // A parameter rather than the sample's injected GridState, so the headless renderer needs no services.
+    [Parameter, EditorRequired]
+    public ClassicGridCell[] Cells { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        foreach (var cell in Cells)
+        {
+            cell.Changed += OnCellChanged;
+        }
+    }
+
+    private void OnCellChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        foreach (var cell in Cells)
+        {
+            cell.Changed -= OnCellChanged;
+        }
+    }
+}

@@ -1,0 +1,8 @@
+@* Shows how often the parent rendered. The parent passes ++_renders; @key recreates the span on
+   every change, which restarts the CSS flash animation. *@
+<span class="render-count" title="Times this component rendered" @key="Value">@Value</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public int Value { get; set; }
+}

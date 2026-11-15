@@ -1,0 +1,44 @@
+@page "/"
+@inject CounterState State
+
+<PageTitle>Wick on WebAssembly</PageTitle>
+
+<h1>Fine-grained rendering on one thread <RenderCount Value="++_renders" /></h1>
+<p class="lead">
+    WebAssembly has a single thread: the background loop, effect re-runs and renders all share it.
+    Each card re-renders only when what it read changes; this page never reads the counter.
+</p>
+
+<div class="cards">
+    <CountCard />
+    <ParityCard />
+    <BatchCard />
+    <LogCard />
+</div>
+
+@code {
+    private readonly CancellationTokenSource _stop = new();
+    private int _renders;
+
+    protected override void OnInitialized() => _ = Task.Run(async () =>
+    {
+        while (!_stop.IsCancellationRequested)
+        {
+            await Task.Delay(1000);
+            if (State.Ticking)
+            {
+                State.Increment();
+            }
+        }
+    });
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _stop.Cancel();
+        }
+
+        base.Dispose(disposing);
+    }
+}

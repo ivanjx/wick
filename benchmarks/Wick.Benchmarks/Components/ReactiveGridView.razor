@@ -1,0 +1,15 @@
+@* As in the sample: the grid reads no reactive state, only the cells do. *@
+@inherits ReactiveComponentBase
+
+<div class="grid">
+    @foreach (var cell in Cells)
+    {
+        <ReactiveCellView Cell="cell" />
+    }
+</div>
+
+@code {
+    // A parameter rather than the sample's injected GridState, so the headless renderer needs no services.
+    [Parameter, EditorRequired]
+    public GridCell[] Cells { get; set; } = default!;
+}
