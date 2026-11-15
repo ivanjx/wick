@@ -234,6 +234,9 @@ public sealed class DependencyTrackingTests
         var observer = new CountingObserver();
         using var stop = new CancellationTokenSource();
 
+        // Subscribed before the first write, even if the tracker task below only starts after the writers finished.
+        observer.Track(() => users.Sum(user => user.Name.Length));
+
         var tracker = Task.Run(() =>
         {
             while (!stop.IsCancellationRequested)

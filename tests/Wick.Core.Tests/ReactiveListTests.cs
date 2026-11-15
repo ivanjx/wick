@@ -99,6 +99,10 @@ public sealed class ReactiveListTests
 
         var list = new ReactiveList<int>();
         var observer = new CountingObserver();
+
+        // Subscribed before the first write: writers that finish before the loop below starts still invalidate it.
+        observer.Track(() => list.Sum(item => (long)item));
+
         var writing = Enumerable.Range(0, writers).Select(writer => Task.Run(() =>
         {
             for (var i = 0; i < itemsPerWriter; i++)
@@ -112,10 +116,11 @@ public sealed class ReactiveListTests
             }
         })).ToArray();
 
-        while (!writing.All(task => task.IsCompleted))
+        do
         {
             observer.Track(() => list.Sum(item => (long)item));
         }
+        while (!writing.All(task => task.IsCompleted));
 
         await Task.WhenAll(writing);
 

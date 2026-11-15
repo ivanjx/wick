@@ -157,6 +157,10 @@ public sealed class ReactiveSetTests
     {
         var set = new ReactiveSet<int>();
         var observer = new CountingObserver();
+
+        // Subscribed before the first write: writers that finish before the loop below starts still invalidate it.
+        observer.Track(() => set.Sum(item => (long)item));
+
         var writing = Enumerable.Range(0, 4).Select(writer => Task.Run(() =>
         {
             for (var i = 0; i < 2_000; i++)
@@ -171,10 +175,11 @@ public sealed class ReactiveSetTests
             }
         })).ToArray();
 
-        while (!writing.All(task => task.IsCompleted))
+        do
         {
             observer.Track(() => set.Sum(item => (long)item));
         }
+        while (!writing.All(task => task.IsCompleted));
 
         await Task.WhenAll(writing);
 
