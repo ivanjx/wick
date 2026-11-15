@@ -12,3 +12,4 @@ WK0004 | Wick | Error | Type cannot be a reactive state type
 WK0005 | Wick | Error | Reactive state requires C# 14
 WK0006 | Wick | Warning | Reactive property holds a mutable collection
 WK0007 | Wick | Warning | Reactive component declares its own disposal
+WK0008 | Wick | Warning | Writing to an element of a reactive array property is not tracked

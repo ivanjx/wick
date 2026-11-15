@@ -154,6 +154,8 @@ State.SelectedIds.Add("42");    // re-renders components that asked Contains("42
 
 All three are thread-safe, and enumerating them while another thread writes is safe. `Snapshot()` returns a consistent `ImmutableArray<T>`. Replacing an immutable collection (`Items = Items.Add(item)`) also works.
 
+Arrays are fine as long as you replace them (`Cells = [.. cells]`). Writing one element in place (`State.Cells[i] = x`) is not tracked, and the compiler warns about it.
+
 ### Batching
 
 Several writes that belong together can be grouped so readers re-render once:
@@ -258,6 +260,7 @@ protected override void Dispose(bool disposing)
 | WK0005 | Error | Reactive state requires C# 14 |
 | WK0006 | Warning | A reactive property holds a mutable collection whose in-place changes are not tracked |
 | WK0007 | Warning | A reactive component declares its own `Dispose` or `DisposeAsync` |
+| WK0008 | Warning | An element of an array held by a reactive property is written in place; readers are not notified |
 
 Warnings can be suppressed with `#pragma warning disable` or in `.editorconfig`.
 

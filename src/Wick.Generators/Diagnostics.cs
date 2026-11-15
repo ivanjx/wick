@@ -61,4 +61,12 @@ internal static class Diagnostics
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor UntrackedArrayElementWrite = new(
+        id: "WK0008",
+        title: "Writing to an element of a reactive array property is not tracked",
+        messageFormat: "Writing to an element of reactive property '{0}' is not tracked; assign a new array, use ReactiveList<T>, or call Reactive.Invalidate",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
 }
