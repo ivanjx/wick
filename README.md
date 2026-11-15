@@ -143,14 +143,16 @@ Mutating a `List<T>` in place is invisible to Wick (and the compiler warns about
 ```csharp
 public ReactiveList<TodoItem> Items { get; } = [];
 public ReactiveDictionary<string, decimal> Prices { get; } = new();
+public ReactiveSet<string> SelectedIds { get; } = [];
 ```
 
 ```csharp
 State.Items.Add(item);          // re-renders components that enumerate or count the list
 State.Prices["AAPL"] = 191.20m; // re-renders components that read "AAPL", not other keys
+State.SelectedIds.Add("42");    // re-renders components that asked Contains("42") or enumerate the set
 ```
 
-Both are thread-safe, and enumerating them while another thread writes is safe. `Snapshot()` returns a consistent `ImmutableArray<T>`. Replacing an immutable collection (`Items = Items.Add(item)`) also works.
+All three are thread-safe, and enumerating them while another thread writes is safe. `Snapshot()` returns a consistent `ImmutableArray<T>`. Replacing an immutable collection (`Items = Items.Add(item)`) also works.
 
 ### Batching
 

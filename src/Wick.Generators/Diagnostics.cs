@@ -49,7 +49,7 @@ internal static class Diagnostics
     public static readonly DiagnosticDescriptor MutableCollectionProperty = new(
         id: "WK0006",
         title: "Reactive property holds a mutable collection",
-        messageFormat: "Reactive property '{0}' has the mutable collection type '{1}'; changes made in place (Add, Remove, indexer) are not tracked. Use ReactiveList or ReactiveDictionary, an immutable collection that is replaced on change, or call Reactive.Invalidate after mutating it.",
+        messageFormat: "Reactive property '{0}' has the mutable collection type '{1}'; changes made in place (Add, Remove, indexer) are not tracked. Use ReactiveList, ReactiveDictionary or ReactiveSet, an immutable collection that is replaced on change, or call Reactive.Invalidate after mutating it.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
