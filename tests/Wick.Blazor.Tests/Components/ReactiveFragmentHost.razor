@@ -1,0 +1,11 @@
+@inherits ReactiveComponentBase
+@inject RenderProbe Probe
+@{
+    using var probe = Probe.Render();
+}
+<div>@ChildContent</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

@@ -1,0 +1,57 @@
+@page "/"
+
+<PageTitle>Wick</PageTitle>
+
+<h1>Wick</h1>
+<p class="lead">
+    State classes marked <code>[ReactiveState]</code> with <code>partial</code> properties track who reads them.
+    Components inheriting <code>ReactiveComponentBase</code> (every component here, through <code>_Imports.razor</code>)
+    re-render when something they read during their last render changes, from any thread, with no events,
+    subscriptions or <code>StateHasChanged</code> calls.
+</p>
+
+<pre class="card"><code>[ReactiveState]
+public sealed partial class CounterState
+{
+    public partial int Count { get; set; }
+}</code></pre>
+
+<p>
+    Badges like <RenderCount Value="++_renders" /> count how many times a component rendered and flash when it renders.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <h2><NavLink href="counter">Counter</NavLink></h2>
+        <p>Sync and async handlers, thread-pool writes, 100,000 concurrent writes, computed properties.</p>
+    </div>
+
+    <div class="card">
+        <h2><NavLink href="grid">Fine-grained grid</NavLink></h2>
+        <p>400 cells: one render per change, next to the classic event pattern that re-renders all of them.</p>
+    </div>
+
+    <div class="card">
+        <h2><NavLink href="market">Live market</NavLink></h2>
+        <p>A singleton written by a background service, shared by every tab, with batched ticks.</p>
+    </div>
+
+    <div class="card">
+        <h2><NavLink href="profile">Nested state</NavLink></h2>
+        <p>Reactive objects inside reactive objects, two-way binding, and dependencies that come and go.</p>
+    </div>
+
+    <div class="card">
+        <h2><NavLink href="todos">Todo list</NavLink></h2>
+        <p>A reactive list, cached derived values, an effect, and batched bulk updates.</p>
+    </div>
+
+    <div class="card">
+        <h2><NavLink href="regions">Reactive regions</NavLink></h2>
+        <p>Why content passed into non-reactive components goes stale, and how <code>&lt;ReactiveRegion&gt;</code> fixes it.</p>
+    </div>
+</div>
+
+@code {
+    private int _renders;
+}

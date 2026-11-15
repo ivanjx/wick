@@ -1,0 +1,13 @@
+<div class="ticker">
+    <span class="symbol">@Ticker.Symbol</span>
+    <RenderCount Value="++_renders" />
+    <span class="price">@Ticker.Price.ToString("N2")</span>
+    <span class="change @(Ticker.Change >= 0 ? "up" : "down")">@Ticker.Change.ToString("+0.00;-0.00")</span>
+</div>
+
+@code {
+    private int _renders;
+
+    [Parameter, EditorRequired]
+    public Ticker Ticker { get; set; } = default!;
+}

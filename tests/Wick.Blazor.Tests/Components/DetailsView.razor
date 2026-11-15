@@ -1,0 +1,6 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+@if (State.ShowDetails)
+{
+    <p id="details">@State.Details</p>
+}

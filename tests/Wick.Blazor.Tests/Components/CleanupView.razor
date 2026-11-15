@@ -1,0 +1,21 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+<p>@State.Count</p>
+
+@code {
+    public TaskCompletionSource AsyncCleanup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public bool Disposed { get; private set; }
+
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        await Task.Yield();
+        AsyncCleanup.SetResult();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        Disposed = disposing && AsyncCleanup.Task.IsCompleted;
+        base.Dispose(disposing);
+    }
+}

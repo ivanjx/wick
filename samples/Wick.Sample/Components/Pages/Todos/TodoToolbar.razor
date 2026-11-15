@@ -1,0 +1,11 @@
+@inject TodoState State
+
+<div class="row">
+    @foreach (var filter in Enum.GetValues<TodoFilter>())
+    {
+        <button class="@(State.Filter == filter ? "" : "secondary")" @onclick="() => State.Filter = filter">@filter</button>
+    }
+
+    <button class="secondary" @onclick="State.CompleteAll">Complete all</button>
+    <button class="secondary" @onclick="State.ClearCompleted">Clear completed</button>
+</div>

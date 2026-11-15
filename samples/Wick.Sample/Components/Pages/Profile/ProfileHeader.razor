@@ -1,0 +1,8 @@
+@inject ProfileState State
+
+<div class="big">@State.User.Name</div>
+<p class="hint">Renders: <RenderCount Value="++_renders" /> · reads <code>User</code> and <code>User.Name</code>.</p>
+
+@code {
+    private int _renders;
+}

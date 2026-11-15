@@ -1,0 +1,10 @@
+@inject RenderProbe Probe
+@{
+    using var probe = Probe.Render();
+}
+<span class="cell">@Cell.Value</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public ClassicCellState Cell { get; set; } = default!;
+}

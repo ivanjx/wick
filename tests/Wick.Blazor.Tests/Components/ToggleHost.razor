@@ -1,0 +1,13 @@
+@* Non-reactive host used to add/remove a child via parameters. *@
+@if (Show)
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter]
+    public bool Show { get; set; } = true;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

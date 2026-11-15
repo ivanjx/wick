@@ -1,0 +1,11 @@
+@inherits ReactiveComponentBase
+@inject RenderProbe Probe
+@{
+    using var probe = Probe.Render();
+}
+<p id="sum">@Cells.Sum(cell => cell.Value)</p>
+
+@code {
+    [Parameter, EditorRequired]
+    public CellState[] Cells { get; set; } = [];
+}

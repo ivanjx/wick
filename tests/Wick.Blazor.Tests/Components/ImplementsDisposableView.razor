@@ -1,0 +1,13 @@
+@inherits ReactiveComponentBase
+@implements IDisposable
+@inject AppState State
+<p>@State.Count</p>
+
+@code {
+    public bool OwnDisposeCalled { get; private set; }
+
+    // Re-implements IDisposable; Blazor prefers the inherited IAsyncDisposable, so this is never called.
+#pragma warning disable WK0007
+    public new void Dispose() => OwnDisposeCalled = true;
+#pragma warning restore WK0007
+}

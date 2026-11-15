@@ -1,0 +1,9 @@
+@inject CounterState State
+
+<div class="big">@State.Count</div>
+<p>Doubled: <strong>@State.Doubled</strong> · @(State.IsEven ? "even" : "odd")</p>
+<p class="hint">Renders: <RenderCount Value="++_renders" /> · reads <code>Count</code> (directly and through computed properties).</p>
+
+@code {
+    private int _renders;
+}

@@ -1,0 +1,32 @@
+@page "/profile"
+
+<PageTitle>Nested state</PageTitle>
+
+<h1>Nested state</h1>
+<p class="lead">
+    <code>ProfileState.User</code> is a reactive object inside a reactive object. Every component depends only on
+    what it read: typing a name re-renders the header but not the contact card, and the bio card stops depending
+    on <code>Bio</code> while it is hidden. Replacing the whole user updates everything that read through it.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <h2>Edit</h2>
+        <ProfileEditor />
+    </div>
+
+    <div class="card">
+        <h2>Header</h2>
+        <ProfileHeader />
+    </div>
+
+    <div class="card">
+        <h2>Contact</h2>
+        <ProfileContact />
+    </div>
+
+    <div class="card">
+        <h2>Bio</h2>
+        <ProfileBio />
+    </div>
+</div>

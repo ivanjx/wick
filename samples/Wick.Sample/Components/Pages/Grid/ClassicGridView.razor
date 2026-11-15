@@ -1,0 +1,35 @@
+@* The conventional pattern: subscribe to change events and re-render the container. *@
+@inherits ComponentBase
+@implements IDisposable
+@inject GridState State
+
+<p class="hint">Grid renders: <RenderCount Value="++_renders" /> · every change re-renders the grid and all cells.</p>
+
+<div class="grid">
+    @foreach (var cell in State.ClassicCells)
+    {
+        <ClassicCellView Cell="cell" />
+    }
+</div>
+
+@code {
+    private int _renders;
+
+    protected override void OnInitialized()
+    {
+        foreach (var cell in State.ClassicCells)
+        {
+            cell.Changed += OnCellChanged;
+        }
+    }
+
+    private void OnCellChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        foreach (var cell in State.ClassicCells)
+        {
+            cell.Changed -= OnCellChanged;
+        }
+    }
+}

@@ -1,0 +1,13 @@
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- Blocking waits and token-less waits are intentional: tests model synchronous producers and
+         reads made inside a tracking scope. -->
+    <NoWarn>$(NoWarn);xUnit1031;xUnit1051</NoWarn>
+  </PropertyGroup>
+
+</Project>

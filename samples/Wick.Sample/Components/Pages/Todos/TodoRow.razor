@@ -1,0 +1,15 @@
+@inject TodoState State
+
+<li class="@(Item.Done ? "done" : "")">
+    <input type="checkbox" @bind="Item.Done" />
+    <span class="title">@Item.Title</span>
+    <RenderCount Value="++_renders" />
+    <button class="secondary" @onclick="() => State.Remove(Item)">Remove</button>
+</li>
+
+@code {
+    private int _renders;
+
+    [Parameter, EditorRequired]
+    public TodoItem Item { get; set; } = default!;
+}

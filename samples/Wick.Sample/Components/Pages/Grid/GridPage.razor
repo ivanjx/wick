@@ -1,0 +1,37 @@
+@page "/grid"
+@inject GridState State
+
+<PageTitle>Fine-grained grid</PageTitle>
+
+<h1>Fine-grained grid</h1>
+<p class="lead">
+    Both grids show the same 400 values and receive the same updates. Each reactive cell reads only its own
+    value, so a change re-renders exactly one cell. The classic grid subscribes to change events and calls
+    <code>InvokeAsync(StateHasChanged)</code>, which re-renders the grid and all 400 of its cells.
+    The badges count renders per component.
+</p>
+
+<div class="row">
+    <button @onclick="State.IncrementRandomCell">Change one random cell</button>
+
+    @if (State.IsRunning)
+    {
+        <button class="secondary" @onclick="State.StopAutoUpdate">Stop background updates</button>
+    }
+    else
+    {
+        <button @onclick="State.StartAutoUpdate">Start background updates (20 per second)</button>
+    }
+</div>
+
+<div class="split">
+    <div class="card">
+        <h2>Reactive</h2>
+        <ReactiveGridView />
+    </div>
+
+    <div class="card">
+        <h2>Classic: events + StateHasChanged</h2>
+        <ClassicGridView />
+    </div>
+</div>

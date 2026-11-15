@@ -1,0 +1,16 @@
+@inject ProfileState State
+
+@if (State.ShowBio)
+{
+    <p>@State.User.Bio</p>
+}
+else
+{
+    <p class="hint">Hidden. This render did not read <code>Bio</code>, so editing it does not re-render this card.</p>
+}
+
+<p class="hint">Renders: <RenderCount Value="++_renders" /> · reads <code>ShowBio</code>, and the bio only while shown.</p>
+
+@code {
+    private int _renders;
+}

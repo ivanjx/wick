@@ -1,0 +1,12 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+@{
+    Renders++;
+}
+<h1 id="parent-label">@State.Label</h1>
+<CountView />
+
+@code {
+    // bUnit's RenderCount also counts renders of descendants.
+    public int Renders { get; private set; }
+}

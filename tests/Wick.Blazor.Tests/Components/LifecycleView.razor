@@ -1,0 +1,26 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+<p id="value">@Value</p>
+<p id="label">@State.Label</p>
+
+@code {
+    [Parameter]
+    public int Value { get; set; }
+
+    public int Initialized { get; private set; }
+    public int InitializedAsync { get; private set; }
+    public int ParametersSet { get; private set; }
+    public int AfterRender { get; private set; }
+
+    protected override void OnInitialized() => Initialized++;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Yield();
+        InitializedAsync++;
+    }
+
+    protected override void OnParametersSet() => ParametersSet++;
+
+    protected override void OnAfterRender(bool firstRender) => AfterRender++;
+}

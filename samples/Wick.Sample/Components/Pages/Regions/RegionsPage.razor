@@ -1,0 +1,88 @@
+@page "/regions"
+@inject CounterState State
+
+<PageTitle>Reactive regions</PageTitle>
+
+<h1>Reactive regions</h1>
+<p class="lead">
+    Content passed to a component (<code>ChildContent</code>) runs during that component's render. A reactive
+    component tracks those reads. A classic <code>ComponentBase</code> (<code>CascadingValue</code>,
+    <code>ErrorBoundary</code>, third-party components) does not, so its content goes stale when the state changes
+    elsewhere; it only catches up when this page re-renders, for example after you click a button here.
+    Wrap such content in <code>&lt;ReactiveRegion&gt;</code>.
+</p>
+
+<div class="row">
+    @if (_ticking is null)
+    {
+        <button @onclick="StartTicking">Increment the counter every 500 ms in the background</button>
+    }
+    else
+    {
+        <button class="secondary" @onclick="StopTicking">Stop</button>
+    }
+</div>
+
+<div class="cards">
+    <ClassicCard Title="Classic card, plain content">
+        <div class="big">@State.Count</div>
+        <p class="hint">Stale: nothing tracks this read.</p>
+    </ClassicCard>
+
+    <ClassicCard Title="Classic card + ReactiveRegion">
+        <ReactiveRegion>
+            <div class="big">@State.Count</div>
+        </ReactiveRegion>
+        <p class="hint">Live: the region tracks its content and re-renders alone; the card does not.</p>
+    </ClassicCard>
+
+    <ReactiveCard Title="Reactive card, plain content">
+        <div class="big">@State.Count</div>
+        <p class="hint">Live: the reactive card tracks the content it renders.</p>
+    </ReactiveCard>
+</div>
+
+@code {
+    private CancellationTokenSource? _ticking;
+
+    private void StartTicking()
+    {
+        _ticking = new CancellationTokenSource();
+        var token = _ticking.Token;
+
+        _ = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+
+            try
+            {
+                while (await timer.WaitForNextTickAsync(token))
+                {
+                    State.Increment();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, token);
+    }
+
+    private void StopTicking()
+    {
+        _ticking?.Cancel();
+        _ticking?.Dispose();
+        _ticking = null;
+    }
+
+    // Override Dispose(bool) instead of re-implementing IDisposable with @implements: that would
+    // bypass the base class, which releases this component's subscriptions.
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            StopTicking();
+        }
+
+        base.Dispose(disposing);
+    }
+}

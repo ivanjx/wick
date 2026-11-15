@@ -1,0 +1,17 @@
+@* Stands in for any non-reactive component that renders content it was given. *@
+@inherits ComponentBase
+
+<div class="card">
+    <h2>@Title <RenderCount Value="++_renders" /></h2>
+    @ChildContent
+</div>
+
+@code {
+    private int _renders;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = "";
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

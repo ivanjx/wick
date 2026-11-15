@@ -1,0 +1,11 @@
+@inject CounterState State
+
+<label>
+    Increment by
+    <input type="number" min="1" @bind="State.Step" @bind:event="oninput" />
+</label>
+<p class="hint">Renders: <RenderCount Value="++_renders" /> · reads only <code>Step</code>, so changing the count leaves it alone.</p>
+
+@code {
+    private int _renders;
+}

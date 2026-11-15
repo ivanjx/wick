@@ -1,0 +1,10 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+@{
+    Renders++;
+}
+<LifecycleView Value="@State.Count" />
+
+@code {
+    public int Renders { get; private set; }
+}

@@ -1,0 +1,93 @@
+@page "/counter"
+@using System.Diagnostics
+@inject CounterState State
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter <RenderCount Value="++_renders" /></h1>
+<p class="lead">
+    Each card reads different properties of one <code>CounterState</code>, so each re-renders only when what it
+    read changes, whichever thread made the change. This page re-renders after its own event handlers
+    (standard Blazor), never because <code>Count</code> changed: it never reads it.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <h2>Value</h2>
+        <CountDisplay />
+    </div>
+
+    <div class="card">
+        <h2>Step</h2>
+        <StepEditor />
+    </div>
+
+    <div class="card">
+        <h2>Ways to change it</h2>
+
+        <div class="row">
+            <button @onclick="State.Increment">Increment</button>
+            <button class="secondary" @onclick="State.Reset">Reset</button>
+        </div>
+
+        <div class="row">
+            <button @onclick="IncrementAfterDelayAsync">Async handler: increment after 500 ms</button>
+        </div>
+
+        <div class="row">
+            <button @onclick="IncrementFromThreadPool">Thread pool: increment in 1 s</button>
+        </div>
+
+        <div class="row">
+            <button @onclick="BurstAsync" disabled="@_bursting">Burst: 100,000 writes from 4 threads</button>
+        </div>
+
+        @if (_lastBurst is not null)
+        {
+            <p class="hint">@_lastBurst Compare with the render badge of the value card.</p>
+        }
+    </div>
+</div>
+
+@code {
+    private const int BurstThreads = 4;
+    private const int WritesPerThread = 25_000;
+
+    private readonly Lock _burstGate = new();
+    private int _renders;
+    private bool _bursting;
+    private string? _lastBurst;
+
+    private async Task IncrementAfterDelayAsync()
+    {
+        await Task.Delay(500);
+        State.Increment();
+    }
+
+    private void IncrementFromThreadPool() => _ = Task.Run(async () =>
+    {
+        await Task.Delay(1000);
+        State.Increment();
+    });
+
+    private async Task BurstAsync()
+    {
+        _bursting = true;
+        var stopwatch = Stopwatch.StartNew();
+
+        await Task.Run(() => Parallel.For(0, BurstThreads, _ =>
+        {
+            for (var i = 0; i < WritesPerThread; i++)
+            {
+                // Count++ is a read plus a write; the lock keeps concurrent increments from being lost.
+                lock (_burstGate)
+                {
+                    State.Count++;
+                }
+            }
+        }));
+
+        _bursting = false;
+        _lastBurst = $"{BurstThreads * WritesPerThread:N0} writes took {stopwatch.ElapsedMilliseconds} ms; renders coalesce while writes continue.";
+    }
+}

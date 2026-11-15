@@ -1,0 +1,9 @@
+@inject MarketState Market
+
+<p>Ticks: <strong>@Market.Ticks.ToString("N0")</strong></p>
+<p>Price updates: <strong>@Market.PriceUpdates.ToString("N0")</strong></p>
+<p class="hint">Renders: <RenderCount Value="++_renders" /> · counted since this page opened; the feed started with the app.</p>
+
+@code {
+    private int _renders;
+}

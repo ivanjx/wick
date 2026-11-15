@@ -1,0 +1,14 @@
+@inject GridState State
+
+<p class="hint">Grid renders: <RenderCount Value="++_renders" /> · the grid reads no reactive state, only the cells do.</p>
+
+<div class="grid">
+    @foreach (var cell in State.Cells)
+    {
+        <ReactiveCellView Cell="cell" />
+    }
+</div>
+
+@code {
+    private int _renders;
+}

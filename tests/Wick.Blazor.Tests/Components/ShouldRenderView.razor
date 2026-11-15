@@ -1,0 +1,9 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+<p id="count">@State.Count</p>
+
+@code {
+    public bool AllowRender { get; set; } = true;
+
+    protected override bool ShouldRender() => AllowRender;
+}

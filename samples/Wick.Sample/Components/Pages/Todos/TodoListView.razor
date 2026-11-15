@@ -1,0 +1,14 @@
+@inject TodoState State
+
+<p class="hint">List renders: <RenderCount Value="++_renders" /> · reads the derived <code>Visible</code>, which changes only when the set of shown items does.</p>
+
+<ul class="todos">
+    @foreach (var item in State.Visible)
+    {
+        <TodoRow @key="item.Id" Item="item" />
+    }
+</ul>
+
+@code {
+    private int _renders;
+}

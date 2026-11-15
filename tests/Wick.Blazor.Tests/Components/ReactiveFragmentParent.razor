@@ -1,0 +1,10 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+@{
+    Renders++;
+}
+<ReactiveFragmentHost><span id="fragment">@State.Count</span></ReactiveFragmentHost>
+
+@code {
+    public int Renders { get; private set; }
+}

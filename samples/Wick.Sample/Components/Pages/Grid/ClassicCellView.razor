@@ -1,0 +1,13 @@
+@inherits ComponentBase
+
+<div class="cell">
+    <span>@Cell.Value</span>
+    <RenderCount Value="++_renders" />
+</div>
+
+@code {
+    private int _renders;
+
+    [Parameter, EditorRequired]
+    public ClassicGridCell Cell { get; set; } = default!;
+}

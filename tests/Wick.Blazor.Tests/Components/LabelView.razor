@@ -1,0 +1,7 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+@inject RenderProbe Probe
+@{
+    using var probe = Probe.Render();
+}
+<p id="label">@State.Label</p>

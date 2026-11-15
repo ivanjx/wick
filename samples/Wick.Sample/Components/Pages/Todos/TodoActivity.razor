@@ -1,0 +1,13 @@
+@inject TodoState State
+
+<ul class="activity">
+    @foreach (var entry in State.Activity)
+    {
+        <li>@entry</li>
+    }
+</ul>
+<p class="hint">Written by <code>Reactive.Effect</code> on the thread pool; renders: <RenderCount Value="++_renders" />.</p>
+
+@code {
+    private int _renders;
+}

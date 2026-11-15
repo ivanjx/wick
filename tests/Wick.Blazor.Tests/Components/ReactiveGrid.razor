@@ -1,0 +1,14 @@
+@* Non-reactive container: it never re-renders on cell changes. *@
+@inject RenderProbe Probe
+@{
+    using var probe = Probe.Render();
+}
+@foreach (var cell in Cells)
+{
+    <ReactiveCell Cell="cell" />
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public CellState[] Cells { get; set; } = [];
+}

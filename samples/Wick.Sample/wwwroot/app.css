@@ -1,0 +1,315 @@
+:root {
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --border: #dfe3ec;
+    --text: #1d2433;
+    --muted: #64708a;
+    --accent: #4f5bd5;
+    --up: #13865a;
+    --down: #c23b3b;
+    --flash: #ffcf4d;
+    --badge: #e8ecf7;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    color: var(--text);
+    background: var(--bg);
+}
+
+h1 {
+    margin: 0 0 .25rem;
+    font-size: 1.6rem;
+}
+
+h1:focus {
+    outline: none;
+}
+
+h2 {
+    margin: 0 0 .75rem;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+p.lead {
+    margin: 0 0 1.5rem;
+    color: var(--muted);
+    max-width: 60rem;
+}
+
+code {
+    font-size: .9em;
+    background: var(--badge);
+    padding: 0 .3em;
+    border-radius: 4px;
+}
+
+/* Layout */
+
+.shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    padding: 1.25rem 1rem;
+    background: #1d2433;
+    color: #fff;
+}
+
+.brand {
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+}
+
+.nav {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+
+.sidebar-status {
+    margin-top: 1.5rem;
+    color: #aab3c5;
+    font-size: .8rem;
+}
+
+.nav a {
+    padding: .45rem .65rem;
+    border-radius: 6px;
+    color: #c7cde0;
+    text-decoration: none;
+}
+
+.nav a:hover {
+    background: #2b3448;
+}
+
+.nav a.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.content {
+    flex: 1;
+    padding: 2rem;
+    min-width: 0;
+}
+
+/* Building blocks */
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+}
+
+.card p {
+    margin: .25rem 0;
+}
+
+.hint {
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.big {
+    font-size: 2.25rem;
+    font-weight: 600;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    margin: .5rem 0;
+}
+
+button {
+    font: inherit;
+    padding: .4rem .8rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+}
+
+button.secondary {
+    background: transparent;
+    color: var(--accent);
+}
+
+button:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+input[type=text], input[type=email], input[type=number], textarea, select {
+    font: inherit;
+    padding: .35rem .5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+label {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    margin: .5rem 0;
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+label.inline {
+    flex-direction: row;
+    align-items: center;
+}
+
+/* Render count badge: flashes whenever the owning component renders. */
+
+.render-count {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 0 .35em;
+    border-radius: .6em;
+    font-size: .7rem;
+    font-weight: 600;
+    text-align: center;
+    background: var(--badge);
+    color: var(--muted);
+    animation: render-flash .7s ease-out;
+}
+
+@keyframes render-flash {
+    from {
+        background: var(--flash);
+        color: #000;
+    }
+}
+
+/* Grid demo */
+
+.split {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(34rem, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    gap: 2px;
+}
+
+.cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 0;
+    border-radius: 4px;
+    background: var(--bg);
+    font-size: .75rem;
+}
+
+.cell .render-count {
+    min-width: 0;
+    font-size: .6rem;
+}
+
+/* Market demo */
+
+.tickers-card {
+    margin-top: 1rem;
+}
+
+.tickers {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: .5rem;
+}
+
+.ticker {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .1rem .5rem;
+    padding: .45rem .6rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: .85rem;
+}
+
+.ticker .symbol {
+    font-weight: 600;
+}
+
+.ticker .price {
+    font-variant-numeric: tabular-nums;
+}
+
+.ticker .change {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.up {
+    color: var(--up);
+}
+
+.down {
+    color: var(--down);
+}
+
+/* Todo demo */
+
+.todos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.todos li {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .4rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.todos li .title {
+    flex: 1;
+}
+
+.todos li.done .title {
+    color: var(--muted);
+    text-decoration: line-through;
+}
+
+.activity {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-family: ui-monospace, monospace;
+    font-size: .85rem;
+}

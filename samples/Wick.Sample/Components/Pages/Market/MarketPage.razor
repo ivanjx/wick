@@ -1,0 +1,38 @@
+@page "/market"
+@inject MarketState Market
+
+<PageTitle>Live market</PageTitle>
+
+<h1>Live market</h1>
+<p class="lead">
+    50 tickers in a singleton written every 100 ms by a <code>BackgroundService</code>, outside any circuit or
+    dispatcher. Open this page in two tabs: both update, each on its own circuit's dispatcher. Each tile reads only
+    its own ticker, so it re-renders only when that ticker moves.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <h2>Summary</h2>
+        <MarketSummary />
+    </div>
+
+    <div class="card">
+        <h2>Mood</h2>
+        <MarketMood />
+    </div>
+
+    <div class="card">
+        <h2>Feed</h2>
+        <FeedStats />
+    </div>
+</div>
+
+<div class="card tickers-card">
+    <h2>Prices</h2>
+    <div class="tickers">
+        @foreach (var ticker in Market.Tickers)
+        {
+            <TickerTile Ticker="ticker" />
+        }
+    </div>
+</div>

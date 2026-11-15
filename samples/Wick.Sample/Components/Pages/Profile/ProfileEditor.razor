@@ -1,0 +1,31 @@
+@inject ProfileState State
+
+<label>
+    Name
+    <input type="text" @bind="State.User.Name" @bind:event="oninput" />
+</label>
+
+<label>
+    Email
+    <input type="email" @bind="State.User.Email" @bind:event="oninput" />
+</label>
+
+<label>
+    Bio
+    <textarea rows="3" @bind="State.User.Bio" @bind:event="oninput"></textarea>
+</label>
+
+<label class="inline">
+    <input type="checkbox" @bind="State.ShowBio" />
+    Show bio
+</label>
+
+<div class="row">
+    <button class="secondary" @onclick="State.SwitchUser">Replace the whole user</button>
+</div>
+
+<p class="hint">Renders: <RenderCount Value="++_renders" /> · reads every field.</p>
+
+@code {
+    private int _renders;
+}

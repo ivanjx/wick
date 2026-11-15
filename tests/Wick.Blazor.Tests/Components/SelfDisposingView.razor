@@ -1,0 +1,20 @@
+@inherits ReactiveComponentBase
+@implements IAsyncDisposable
+@inject AppState State
+@inject ComponentRegistry Registry
+<p>@State.Count</p>
+
+@code {
+    public bool OwnDisposeCalled { get; private set; }
+
+    protected override void OnInitialized() => Registry.Add(this);
+
+    // Deliberately re-implements IAsyncDisposable, so the renderer calls this instead of ReactiveComponentCore.DisposeAsync().
+#pragma warning disable WK0007
+    public new ValueTask DisposeAsync()
+    {
+        OwnDisposeCalled = true;
+        return ValueTask.CompletedTask;
+    }
+#pragma warning restore WK0007
+}

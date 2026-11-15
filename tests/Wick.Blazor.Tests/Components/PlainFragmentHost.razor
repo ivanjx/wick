@@ -1,0 +1,7 @@
+@* A non-reactive component that renders content supplied by its parent. *@
+<div>@ChildContent</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

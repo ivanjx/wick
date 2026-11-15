@@ -1,0 +1,49 @@
+@page "/todos"
+@inject TodoState State
+
+<PageTitle>Todo list</PageTitle>
+
+<h1>Todo list</h1>
+<p class="lead">
+    Items are reactive objects in a <code>ReactiveList</code>. Toggling an item re-renders its row; the list
+    reads the derived <code>Visible</code> and re-renders only when the set of shown items changes, which with
+    <em>All</em> means only on add and remove. The summary reads the derived <code>Remaining</code>, and an
+    effect logs every change of it. <em>Complete all</em> writes every item inside <code>Reactive.Batch</code>.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <form class="row" @onsubmit="Add">
+            <input type="text" placeholder="What needs doing?" @bind="_title" @bind:event="oninput" />
+            <button type="submit" disabled="@string.IsNullOrWhiteSpace(_title)">Add</button>
+        </form>
+
+        <TodoToolbar />
+        <TodoListView />
+    </div>
+
+    <div class="card">
+        <h2>Summary</h2>
+        <TodoSummary />
+    </div>
+
+    <div class="card">
+        <h2>Activity</h2>
+        <TodoActivity />
+    </div>
+</div>
+
+@code {
+    private string _title = "";
+
+    private void Add()
+    {
+        if (string.IsNullOrWhiteSpace(_title))
+        {
+            return;
+        }
+
+        State.Add(_title.Trim());
+        _title = "";
+    }
+}

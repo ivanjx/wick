@@ -1,0 +1,20 @@
+@inherits ReactiveLayoutComponentBase
+@inject TodoState Todos
+
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">Wick</div>
+        <NavMenu />
+
+        @* The layout is reactive too: besides navigation, only a change in the number of open todos re-renders it. *@
+        <div class="sidebar-status">@Todos.Remaining open todos · layout renders: @(++_renders)</div>
+    </aside>
+
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+@code {
+    private int _renders;
+}

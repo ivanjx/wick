@@ -1,0 +1,12 @@
+@inject MarketState Market
+
+<p>Advancing vs declining</p>
+<div class="big">@Market.Mood</div>
+<p class="hint">
+    Renders: <RenderCount Value="++_renders" /> · reads a <code>Reactive.Derived</code> value computed from all 50
+    tickers. It is recomputed on every tick, but this re-renders only when the result flips.
+</p>
+
+@code {
+    private int _renders;
+}

@@ -1,0 +1,9 @@
+@inject TodoState State
+
+<div class="big">@State.Remaining</div>
+<p>of @State.Items.Count left</p>
+<p class="hint">Renders: <RenderCount Value="++_renders" /> · reads the derived <code>Remaining</code> and the item count, so toggling an item re-renders this only when the number left changes.</p>
+
+@code {
+    private int _renders;
+}

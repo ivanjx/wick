@@ -1,0 +1,28 @@
+@inherits ReactiveComponentBase
+@inject AppState State
+@inject RenderProbe Probe
+@inject ComponentRegistry Registry
+@{
+    using var probe = Probe.Render();
+}
+<p id="count">@State.Count</p>
+<button id="increment" @onclick="Increment">+</button>
+<button id="increment-async" @onclick="IncrementThriceAfterAwaitAsync">+++</button>
+<button id="label" @onclick="ChangeLabel">label</button>
+
+@code {
+    protected override void OnInitialized() => Registry.Add(this);
+
+    private void Increment() => State.Count++;
+
+    private async Task IncrementThriceAfterAwaitAsync()
+    {
+        await Task.Yield();
+
+        State.Count++;
+        State.Count++;
+        State.Count++;
+    }
+
+    private void ChangeLabel() => State.Label += "!";
+}
