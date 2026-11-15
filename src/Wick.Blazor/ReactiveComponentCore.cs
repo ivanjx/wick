@@ -58,25 +58,6 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     /// <param name="onError">Receives exceptions thrown by runs; see <see cref="Reactive.Effect"/>.</param>
     protected ReactiveEffect Effect(Action run, Action<Exception>? onError = null) => Own(Reactive.Effect(run, onError));
 
-    /// <summary>
-    /// Component-owned form of <see cref="Reactive.Resource{TSource, T}"/>: the resource is disposed (cancelling an
-    /// in-flight fetch) together with the component. Typically created in <c>OnInitialized</c>; the component
-    /// re-renders when <see cref="Resource{T}.Value"/>, <see cref="Resource{T}.IsLoading"/> or
-    /// <see cref="Resource{T}.Error"/> change, if it read them.
-    /// </summary>
-    /// <remarks>Disposal follows the same rules as <see cref="Effect"/>.</remarks>
-    /// <param name="source">Tracked; when what it read changes and its value differs, the resource refetches.</param>
-    /// <param name="fetch">Loads the value for a source value; reads inside it are not tracked.</param>
-    protected Resource<T> Resource<TSource, T>(Func<TSource> source, Func<TSource, CancellationToken, Task<T>> fetch)
-        => Own(Reactive.Resource(source, fetch));
-
-    /// <summary>
-    /// Component-owned form of <see cref="Reactive.Resource{T}"/>: fetches once (and on
-    /// <see cref="Resource{T}.Reload"/>), and is disposed together with the component.
-    /// </summary>
-    /// <param name="fetch">Loads the value; reads inside it are not tracked.</param>
-    protected Resource<T> Resource<T>(Func<CancellationToken, Task<T>> fetch) => Own(Reactive.Resource(fetch));
-
     private TOwned Own<TOwned>(TOwned owned)
         where TOwned : IDisposable
     {

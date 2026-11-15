@@ -113,32 +113,6 @@ public static class Reactive
         return ReactiveEffect.Start(effect, onError);
     }
 
-    /// <summary>
-    /// Creates a value loaded asynchronously by <paramref name="fetch"/> from the result of <paramref name="source"/>.
-    /// The source is tracked like a derived value: when its result changes, the fetch in flight is cancelled and
-    /// <paramref name="fetch"/> runs again with the new result. Reads made by <paramref name="fetch"/> are not tracked.
-    /// The first fetch starts before this method returns.
-    /// </summary>
-    public static Resource<T> Resource<TSource, T>(Func<TSource> source, Func<TSource, CancellationToken, Task<T>> fetch)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(fetch);
-
-        // Qualified: inside this class, the simple name refers to the factory methods.
-        return Wick.Core.Resource<T>.Create(source, fetch);
-    }
-
-    /// <summary>
-    /// Creates a value loaded asynchronously by <paramref name="fetch"/>, which runs now and again on each
-    /// <see cref="Wick.Core.Resource{T}.Reload"/>. Reads made by <paramref name="fetch"/> are not tracked.
-    /// </summary>
-    public static Resource<T> Resource<T>(Func<CancellationToken, Task<T>> fetch)
-    {
-        ArgumentNullException.ThrowIfNull(fetch);
-
-        return Wick.Core.Resource<T>.Create(fetch);
-    }
-
     internal static void ReportUnhandledEffectException(Exception exception)
     {
         var handler = UnhandledEffectException;
