@@ -276,3 +276,7 @@ Build and test:
 dotnet build Wick.slnx
 dotnet test --solution Wick.slnx
 ```
+
+## License
+
+[MIT](LICENSE)
