@@ -1,0 +1,30 @@
+@* Owns an effect and holds its asynchronous cleanup open until the test releases it. *@
+@inherits ReactiveComponentBase
+@inject AppState State
+<p>async effect</p>
+
+@code {
+    private int _runs;
+
+    public int Runs => Volatile.Read(ref _runs);
+
+    public TaskCompletionSource ReleaseCleanup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public bool Disposed { get; private set; }
+
+    protected override void OnInitialized() => Effect(Track);
+
+    private void Track()
+    {
+        _ = State.Count;
+        Interlocked.Increment(ref _runs);
+    }
+
+    protected override async ValueTask DisposeAsyncCore() => await ReleaseCleanup.Task;
+
+    protected override void Dispose(bool disposing)
+    {
+        Disposed = disposing;
+        base.Dispose(disposing);
+    }
+}

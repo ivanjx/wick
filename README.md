@@ -192,16 +192,25 @@ The value is recomputed once when its inputs change, and its readers re-render o
 
 ### Effects
 
-Run code whenever the state it reads changes, for logging, persistence, or syncing state:
+Run code whenever the state it reads changes, for logging, persistence, or syncing state. In a component, use `Effect`; it is disposed together with the component:
 
 ```csharp
-var effect = Reactive.Effect(() => storage.Save("filter", State.Filter));
+protected override void OnInitialized()
+{
+    Effect(() => storage.Save("filter", State.Filter));
+}
+```
 
-// Later, when the owner goes away:
+Outside components (in a state class or a service), use `Reactive.Effect` and dispose it when its owner goes away:
+
+```csharp
+var effect = Reactive.Effect(() => logger.LogInformation("Filter is now {Filter}", State.Filter));
+
+// When the owner is disposed:
 effect.Dispose();
 ```
 
-The effect runs once immediately and again, on the thread pool, after each change. Effects may write reactive state. Always dispose them; in a component, do it in `Dispose(bool)`.
+An effect runs once immediately and again, on the thread pool, after each change. Effects may write reactive state. UI work inside a component effect should go through `InvokeAsync`.
 
 ### Changes Wick can't see
 
@@ -231,7 +240,7 @@ Reactive components release their dependencies automatically. For your own clean
 ```csharp
 protected override void Dispose(bool disposing)
 {
-    _effect?.Dispose();
+    _timer?.Dispose();
     base.Dispose(disposing);
 }
 ```

@@ -15,6 +15,7 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     private int _dirty;
     private int _pendingFlushes;
     private volatile bool _disposed;
+    private List<ReactiveEffect>? _effects;
 
     private protected ReactiveComponentCore()
     {
@@ -36,6 +37,42 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         {
             BuildTrackedRenderTree(builder);
         }
+    }
+
+    /// <summary>
+    /// Component-owned form of <see cref="Reactive.Effect"/>: the effect is disposed together with the component,
+    /// so it needs no cleanup in <see cref="Dispose(bool)"/>. Like <see cref="Reactive.Effect"/>, it runs once
+    /// immediately on the calling thread and re-runs on the thread pool whenever reactive state it read changes;
+    /// UI work inside it, such as <see cref="ComponentBase.StateHasChanged"/>, should go through
+    /// <see cref="ComponentBase.InvokeAsync(Action)"/>.
+    /// </summary>
+    /// <remarks>
+    /// The returned effect may be disposed early; disposing it again with the component is harmless. Calling this
+    /// method after the component was disposed (for example after an <c>await</c> in <c>OnInitializedAsync</c> that
+    /// outlived the component) still runs <paramref name="run"/> once, then disposes the effect immediately so it
+    /// never re-runs. Safe to call from any thread.
+    /// </remarks>
+    /// <param name="run">The side effect; reactive state it reads becomes its dependencies.</param>
+    /// <param name="onError">Receives exceptions thrown by runs; see <see cref="Reactive.Effect"/>.</param>
+    protected ReactiveEffect Effect(Action run, Action<Exception>? onError = null)
+    {
+        var effect = Reactive.Effect(run, onError);
+
+        // The private observer guards _effects: it never locks itself, and a dedicated Lock would cost every
+        // component an allocation even when it creates no effects.
+        lock (_observer)
+        {
+            if (!_disposed)
+            {
+                (_effects ??= []).Add(effect);
+
+                return effect;
+            }
+        }
+
+        effect.Dispose();
+
+        return effect;
     }
 
     private protected abstract void BuildTrackedRenderTree(RenderTreeBuilder builder);
@@ -139,6 +176,23 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     {
         _disposed = true;
         _observer.Dispose();
+
+        List<ReactiveEffect>? effects;
+        lock (_observer)
+        {
+            effects = _effects;
+            _effects = null;
+        }
+
+        if (effects is null)
+        {
+            return;
+        }
+
+        foreach (var effect in effects)
+        {
+            effect.Dispose();
+        }
     }
 
     private async ValueTask AwaitThenDispose(ValueTask pending)

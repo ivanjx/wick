@@ -1,0 +1,26 @@
+@* Owns an effect created in OnInitialized; renders nothing reactive so only the effect observes Count. *@
+@inherits ReactiveComponentBase
+@using Wick.Core
+@inject AppState State
+<p>effect</p>
+
+@code {
+    private int _runs;
+    private int _lastSeen = -1;
+
+    public int Runs => Volatile.Read(ref _runs);
+
+    public int LastSeen => Volatile.Read(ref _lastSeen);
+
+    public ReactiveEffect OwnedEffect { get; private set; } = null!;
+
+    protected override void OnInitialized() => OwnedEffect = Effect(Track);
+
+    public ReactiveEffect CreateEffect(Action run) => Effect(run);
+
+    private void Track()
+    {
+        Volatile.Write(ref _lastSeen, State.Count);
+        Interlocked.Increment(ref _runs);
+    }
+}
