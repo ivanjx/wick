@@ -18,11 +18,16 @@ namespace Wick.Core;
 /// </summary>
 /// <remarks>
 /// A key that was read while tracking keeps a small subscription node for the lifetime of the dictionary, even after
-/// the key is removed; avoid tracked lookups of unbounded sets of distinct missing keys.
+/// the key is removed; avoid tracked lookups of unbounded sets of distinct missing keys. Such a node is named after its
+/// key (<c>ReactiveDictionary[AAPL]</c>) only when created while <see cref="WickDiagnostics.Enabled"/> is set.
 /// </remarks>
 public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
     where TKey : notnull
 {
+    private const string CountNodeName = "ReactiveDictionary<TKey, TValue>.Count";
+    private const string EntriesNodeName = "ReactiveDictionary<TKey, TValue>";
+    private const string KeyNodeName = "ReactiveDictionary[key]";
+
     private readonly Lock _gate = new();
     private readonly Dictionary<TKey, TValue> _entries;
     private readonly Dictionary<TKey, ReactiveNode> _keyNodes;
@@ -48,7 +53,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     {
         get
         {
-            ReactiveProperty.Track(ref _countNode);
+            ReactiveProperty.Track(ref _countNode, CountNodeName);
 
             lock (_gate)
             {
@@ -91,7 +96,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     /// <summary>The entries as an immutable array; tracked like enumeration.</summary>
     public ImmutableArray<KeyValuePair<TKey, TValue>> Snapshot()
     {
-        ReactiveProperty.Track(ref _entriesNode);
+        ReactiveProperty.Track(ref _entriesNode, EntriesNodeName);
 
         return ImmutableCollectionsMarshal.AsImmutableArray(Volatile.Read(ref _snapshot) ?? CreateSnapshot());
     }
@@ -290,7 +295,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         lock (_gate)
         {
             ref var slot = ref CollectionsMarshal.GetValueRefOrAddDefault(_keyNodes, key, out _);
-            node = slot ??= new ReactiveNode();
+            node = slot ??= new ReactiveNode(WickDiagnostics.Enabled ? $"ReactiveDictionary[{key}]" : KeyNodeName);
         }
 
         observer.RecordDependency(node);

@@ -22,12 +22,16 @@ public abstract class ReactiveTestContext : BunitContext
 
     public ComponentRegistry Registry { get; } = new();
 
-    /// <summary>Waits until every scheduled reactive flush of the given components has completed.</summary>
+    /// <summary>
+    /// Waits with the public <see cref="ReactiveRendering.WhenIdleAsync"/> until every scheduled reactive render and
+    /// effect has completed, then checks that the given components indeed have no flush left.
+    /// </summary>
     protected static void Settle(params ReactiveComponentCore[] components)
     {
-        var settled = SpinWait.SpinUntil(() => components.All(component => component.PendingFlushes == 0), Timeout);
+        var settled = ReactiveRendering.WhenIdleAsync().Wait(Timeout);
 
         Assert.True(settled, "Reactive flushes did not complete.");
+        Assert.All(components, component => Assert.Equal(0, component.PendingFlushes));
     }
 
     public void AssertRenderedOnDispatcherOnly()

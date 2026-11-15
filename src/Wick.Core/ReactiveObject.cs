@@ -60,7 +60,7 @@ public abstract class ReactiveObject : IReactiveState
 
             if (!_nodes.TryGetValue(property, out var node))
             {
-                node = new ReactiveNode();
+                node = new ReactiveNode(GetType().Name + "." + property);
                 _nodes.Add(property, node);
             }
 

@@ -20,6 +20,9 @@ namespace Wick.Core;
 /// </remarks>
 public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 {
+    private const string CountNodeName = "ReactiveList<T>.Count";
+    private const string ItemsNodeName = "ReactiveList<T>";
+
     private readonly Lock _gate = new();
     private readonly List<T> _items;
     private T[]? _snapshot;
@@ -42,7 +45,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
     {
         get
         {
-            ReactiveProperty.Track(ref _countNode);
+            ReactiveProperty.Track(ref _countNode, CountNodeName);
 
             lock (_gate)
             {
@@ -57,7 +60,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
     {
         get
         {
-            ReactiveProperty.Track(ref _itemsNode);
+            ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
             lock (_gate)
             {
@@ -86,7 +89,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
     /// <summary>The current items as an immutable array; tracked like enumeration.</summary>
     public ImmutableArray<T> Snapshot()
     {
-        ReactiveProperty.Track(ref _itemsNode);
+        ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
         return ImmutableCollectionsMarshal.AsImmutableArray(Volatile.Read(ref _snapshot) ?? CreateSnapshot());
     }
@@ -100,7 +103,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
     public bool Contains(T item)
     {
-        ReactiveProperty.Track(ref _itemsNode);
+        ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
         lock (_gate)
         {
@@ -110,7 +113,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
     public int IndexOf(T item)
     {
-        ReactiveProperty.Track(ref _itemsNode);
+        ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
         lock (_gate)
         {
@@ -120,7 +123,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
     public void CopyTo(T[] array, int arrayIndex)
     {
-        ReactiveProperty.Track(ref _itemsNode);
+        ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
         lock (_gate)
         {

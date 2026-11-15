@@ -13,7 +13,7 @@ namespace Wick.Core;
 /// that keeps changing what it reads is stopped after <see cref="MaxConsecutiveSelfTriggeredRuns"/> consecutive
 /// self-triggered runs and reports an <see cref="InvalidOperationException"/>; it runs again on the next outside change.
 /// </remarks>
-public sealed class ReactiveEffect : IDisposable
+public sealed class ReactiveEffect : IDisposable, IReactiveObserverOwner
 {
     public const int MaxConsecutiveSelfTriggeredRuns = 100;
 
@@ -38,6 +38,8 @@ public sealed class ReactiveEffect : IDisposable
     }
 
     internal int DependencyCount => _observer.DependencyCount;
+
+    ReactiveObserver IReactiveObserverOwner.Observer => _observer;
 
     public void Dispose() => _observer.Dispose();
 
@@ -65,29 +67,41 @@ public sealed class ReactiveEffect : IDisposable
         return instance;
     }
 
-    private void Schedule() => ThreadPool.UnsafeQueueUserWorkItem(static effect => effect.RunPending(), this, preferLocal: false);
+    private void Schedule()
+    {
+        PendingWork.Add();
+        ThreadPool.UnsafeQueueUserWorkItem(static effect => effect.RunPending(), this, preferLocal: false);
+    }
 
     private void RunPending()
     {
         var selfTriggeredRuns = 0;
 
-        do
+        try
         {
-            if (_observer.Disposed)
+            do
             {
-                Volatile.Write(ref _state, Idle);
-                return;
-            }
+                if (_observer.Disposed)
+                {
+                    Volatile.Write(ref _state, Idle);
+                    return;
+                }
 
-            var error = Execute();
-            if (error is not null)
-            {
-                Report(error.SourceException);
-            }
+                var error = Execute();
+                if (error is not null)
+                {
+                    Report(error.SourceException);
+                }
 
-            selfTriggeredRuns = _selfInvalidated ? selfTriggeredRuns + 1 : 0;
+                selfTriggeredRuns = _selfInvalidated ? selfTriggeredRuns + 1 : 0;
+            }
+            while (Complete(selfTriggeredRuns));
         }
-        while (Complete(selfTriggeredRuns));
+        finally
+        {
+            // After the runs: renders and effects they triggered were counted first, so idle waiters see no gap.
+            PendingWork.Remove();
+        }
     }
 
     /// <summary>Ends a run. Returns true when another run was requested meanwhile and should follow.</summary>

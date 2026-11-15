@@ -13,7 +13,7 @@ namespace Wick.Generators;
 /// <code>
 /// public partial int Count
 /// {
-///     get => ReactiveProperty.Get(ref field, ref __reactiveNode_Count);
+///     get => ReactiveProperty.Get(ref field, ref __reactiveNode_Count, "State.Count");
 ///     set => ReactiveProperty.Set(ref field, value, ref __reactiveNode_Count);
 /// }
 /// </code>
@@ -276,6 +276,7 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
         foreach (var property in state.Properties)
         {
             var node = NodeFieldPrefix + property.Name;
+            var nodeName = SymbolDisplay.FormatLiteral($"{state.Type.Name}.{property.Name}", quote: true);
 
             writer.Line();
 
@@ -290,7 +291,7 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
 
             writer.Line($"{property.Modifiers} {property.Type} {property.Identifier}");
             writer.Open();
-            writer.Line($"{Prefix(property.GetModifiers)}get => {Core}.ReactiveProperty.Get(ref field, ref {node});");
+            writer.Line($"{Prefix(property.GetModifiers)}get => {Core}.ReactiveProperty.Get(ref field, ref {node}, {nodeName});");
             writer.Line(property.SetKeyword == "init"
                 ? $"{Prefix(property.SetModifiers)}init => field = value;"
                 : $"{Prefix(property.SetModifiers)}set => {Core}.ReactiveProperty.Set(ref field, value, ref {node});");

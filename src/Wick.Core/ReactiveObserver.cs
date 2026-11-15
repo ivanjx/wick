@@ -130,6 +130,14 @@ public abstract class ReactiveObserver : IDisposable
     {
     }
 
+    /// <summary>
+    /// Receives a node whose change is about to invalidate this observer, before <see cref="OnInvalidated"/> runs.
+    /// Called only while <see cref="WickDiagnostics.Enabled"/> is set; observers that report why they re-ran keep it.
+    /// </summary>
+    internal virtual void RecordCause(ReactiveNode node)
+    {
+    }
+
     internal void Invalidate()
     {
         if (_disposed)

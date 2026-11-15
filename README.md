@@ -268,6 +268,46 @@ protected override void Dispose(bool disposing)
 }
 ```
 
+### Why did this re-render?
+
+Turn on diagnostics during development to log every reactive re-render with its cause:
+
+```csharp
+if (builder.Environment.IsDevelopment())
+{
+    WickDiagnostics.Enabled = true;
+    WickDiagnostics.Message += message => Console.WriteLine(message);
+}
+```
+
+```text
+CountDisplay re-render: CounterState.Count changed
+DetailsView re-render: ProfileState.User, ProfileState.ShowBio changed
+```
+
+Without a `Message` subscriber, messages go to `System.Diagnostics.Trace` (category `Wick`). To see what a component currently depends on, call `WickDiagnostics.GetDependencies(component)`; it also accepts effects and derived values. When diagnostics are off they cost a single flag check.
+
+### Testing components
+
+Wick re-renders asynchronously, so a test that changes state must wait before checking the markup. `ReactiveRendering.WhenIdleAsync()` completes once every scheduled re-render and effect has finished, including chains where one triggers another:
+
+```csharp
+[Fact]
+public async Task Shows_the_new_count()
+{
+    var state = new CounterState();
+    Services.AddSingleton(state);
+    var cut = Render<CountDisplay>();
+
+    await Task.Run(() => state.Count = 5);
+    await ReactiveRendering.WhenIdleAsync();
+
+    cut.MarkupMatches("<p>5</p>");
+}
+```
+
+It waits for the whole process, so tests running in parallel can delay it, but never make it return early.
+
 ## Diagnostics
 
 | ID | Severity | Meaning |

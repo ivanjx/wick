@@ -18,11 +18,15 @@ namespace Wick.Core;
 /// </summary>
 /// <remarks>
 /// An item that was checked while tracking keeps a small subscription node for the lifetime of the set, even after
-/// the item is removed; avoid tracked checks of unbounded sets of distinct missing items.
+/// the item is removed; avoid tracked checks of unbounded sets of distinct missing items. Such a node is named after its
+/// item (<c>ReactiveSet[tag]</c>) only when created while <see cref="WickDiagnostics.Enabled"/> is set.
 /// </remarks>
 public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
     where T : notnull
 {
+    private const string ItemsNodeName = "ReactiveSet<T>";
+    private const string ItemNodeName = "ReactiveSet[item]";
+
     private readonly Lock _gate = new();
     private readonly HashSet<T> _items;
     private readonly Dictionary<T, ReactiveNode> _itemNodes;
@@ -53,7 +57,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
     {
         get
         {
-            ReactiveProperty.Track(ref _itemsNode);
+            ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
             lock (_gate)
             {
@@ -67,7 +71,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
     /// <summary>The items as an immutable array; tracked like enumeration.</summary>
     public ImmutableArray<T> Snapshot()
     {
-        ReactiveProperty.Track(ref _itemsNode);
+        ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
         return ImmutableCollectionsMarshal.AsImmutableArray(Volatile.Read(ref _snapshot) ?? CreateSnapshot());
     }
@@ -306,7 +310,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         // Materialized outside the lock: enumerating another reactive set takes its own gate.
         var others = other.ToArray();
 
-        ReactiveProperty.Track(ref _itemsNode);
+        ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
         lock (_gate)
         {
@@ -336,7 +340,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         lock (_gate)
         {
             ref var slot = ref CollectionsMarshal.GetValueRefOrAddDefault(_itemNodes, item, out _);
-            node = slot ??= new ReactiveNode();
+            node = slot ??= new ReactiveNode(WickDiagnostics.Enabled ? $"ReactiveSet[{item}]" : ItemNodeName);
         }
 
         observer.RecordDependency(node);

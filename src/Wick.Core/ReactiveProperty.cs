@@ -11,9 +11,12 @@ namespace Wick.Core;
 public static class ReactiveProperty
 {
     /// <summary>Records the read (subscribing before the value is read), then returns <paramref name="field"/>.</summary>
-    public static T Get<T>(ref T field, ref ReactiveNode? node)
+    /// <param name="field">The property's backing field.</param>
+    /// <param name="node">The property's node field; created on the first tracked read.</param>
+    /// <param name="name">The node's diagnostic name, <c>"TypeName.PropertyName"</c>; used only when the node is created.</param>
+    public static T Get<T>(ref T field, ref ReactiveNode? node, string name)
     {
-        Track(ref node);
+        Track(ref node, name);
 
         return field;
     }
@@ -33,13 +36,15 @@ public static class ReactiveProperty
     }
 
     /// <summary>Subscribes the tracking observer to a lazily created node; no allocation when nothing tracks.</summary>
+    /// <param name="node">The node field; created on the first tracked read.</param>
+    /// <param name="name">A constant diagnostic name for the node, used only when the node is created.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void Track(ref ReactiveNode? node)
+    internal static void Track(ref ReactiveNode? node, string name)
     {
         var observer = ReactiveObserver.Current;
         if (observer is not null)
         {
-            observer.RecordDependency(Volatile.Read(ref node) ?? CreateNode(ref node));
+            observer.RecordDependency(Volatile.Read(ref node) ?? CreateNode(ref node, name));
         }
     }
 
@@ -54,9 +59,9 @@ public static class ReactiveProperty
         Volatile.Read(ref node)?.Notify();
     }
 
-    private static ReactiveNode CreateNode(ref ReactiveNode? node)
+    private static ReactiveNode CreateNode(ref ReactiveNode? node, string name)
     {
-        var created = new ReactiveNode();
+        var created = new ReactiveNode(name);
 
         return Interlocked.CompareExchange(ref node, created, null) ?? created;
     }

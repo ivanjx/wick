@@ -17,12 +17,12 @@ namespace Wick.Core;
 /// computation are cached and rethrown by <see cref="Value"/>. The computation must not write reactive state.
 /// Dispose to release the subscriptions early; an unreferenced instance is released after garbage collection.
 /// </remarks>
-public sealed class Derived<T> : IDisposable
+public sealed class Derived<T> : IDisposable, IReactiveObserverOwner
 {
     private readonly Lock _gate = new();
     private readonly Func<T> _compute;
     private readonly IEqualityComparer<T> _comparer;
-    private readonly ReactiveNode _node = new();
+    private readonly ReactiveNode _node = new("Derived<T>");
     private readonly SourceObserver _observer;
     private T _value = default!;
     private ExceptionDispatchInfo? _error;
@@ -46,6 +46,8 @@ public sealed class Derived<T> : IDisposable
     }
 
     internal ReactiveNode Node => _node;
+
+    ReactiveObserver IReactiveObserverOwner.Observer => _observer;
 
     /// <summary>The current value; recomputed first if a dependency changed since the last computation.</summary>
     public T Value

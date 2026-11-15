@@ -9,7 +9,7 @@ namespace Wick.Blazor;
 /// so this class seals <see cref="ComponentBase.BuildRenderTree"/> and <see cref="ReactiveComponentBase"/>
 /// re-declares a new virtual <c>BuildRenderTree</c> for Razor to override. Only public Blazor API is used.
 /// </summary>
-public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsyncDisposable
+public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsyncDisposable, IReactiveObserverOwner
 {
     private readonly ComponentObserver _observer;
     private int _dirty;
@@ -26,6 +26,8 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     internal int PendingFlushes => Volatile.Read(ref _pendingFlushes);
 
     internal int DependencyCount => _observer.DependencyCount;
+
+    ReactiveObserver IReactiveObserverOwner.Observer => _observer;
 
     protected sealed override void BuildRenderTree(RenderTreeBuilder builder)
     {
@@ -88,6 +90,7 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         // synchronously when the dispatcher is idle, which would render once per mutation and make
         // the producer pay for rendering. Hop to the thread pool first so consecutive mutations coalesce.
         Interlocked.Increment(ref _pendingFlushes);
+        PendingWork.Add();
         ThreadPool.UnsafeQueueUserWorkItem(static component => component.ScheduleFlush(), this, preferLocal: false);
     }
 
@@ -100,7 +103,17 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         {
             if (!_disposed && Interlocked.Exchange(ref _dirty, 0) == 1)
             {
+                if (WickDiagnostics.Enabled)
+                {
+                    WickDiagnostics.ReportRender(GetType(), _observer.Causes?.Take());
+                }
+
                 StateHasChanged();
+            }
+            else if (WickDiagnostics.Enabled)
+            {
+                // A render in between (for example the parent's) already covered these changes.
+                _observer.Causes?.Clear();
             }
         }
         catch (Exception exception)
@@ -109,7 +122,9 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         }
         finally
         {
+            // In this order: once ReactiveRendering.WhenIdleAsync completes, every component reports no pending flush.
             Interlocked.Decrement(ref _pendingFlushes);
+            PendingWork.Remove();
         }
     }
 
@@ -214,6 +229,25 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     private sealed class ComponentObserver(ReactiveComponentCore component) : ReactiveObserver
     {
         private readonly WeakReference<ReactiveComponentCore> _component = new(component);
+
+        private ChangeCauses? _causes;
+
+        /// <summary>Changes recorded since the last report; created on the first change seen with diagnostics enabled.</summary>
+        internal ChangeCauses? Causes => Volatile.Read(ref _causes);
+
+        internal override void RecordCause(ReactiveNode node)
+        {
+            var causes = Volatile.Read(ref _causes) ?? CreateCauses();
+
+            causes.Add(node);
+        }
+
+        private ChangeCauses CreateCauses()
+        {
+            var created = new ChangeCauses();
+
+            return Interlocked.CompareExchange(ref _causes, created, null) ?? created;
+        }
 
         protected override void OnInvalidated()
         {
