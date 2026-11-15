@@ -1,0 +1,12 @@
+@inject DraftState State
+
+<textarea rows="6" placeholder="Type, pause, then type again" @bind="State.Text" @bind:event="oninput"></textarea>
+
+<p class="hint">
+    @(State.Text == State.SavedText ? "All changes saved" : "Unsaved changes").
+    Renders: <RenderCount Value="++_renders" />.
+</p>
+
+@code {
+    private int _renders;
+}

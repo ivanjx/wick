@@ -45,9 +45,28 @@ public abstract class ReactiveObserver : IDisposable
     /// </summary>
     public TrackingScope BeginTracking()
     {
+        ObjectDisposedException.ThrowIf(!TryBeginTracking(out var scope), this);
+
+        return scope;
+    }
+
+    /// <summary>Like <see cref="BeginTracking"/>, but returns an inactive scope instead of throwing once disposed.</summary>
+    internal TrackingScope BeginTrackingUnlessDisposed()
+    {
+        TryBeginTracking(out var scope);
+
+        return scope;
+    }
+
+    private bool TryBeginTracking(out TrackingScope scope)
+    {
         lock (_gate)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_disposed)
+            {
+                scope = default;
+                return false;
+            }
 
             if (_isTracking)
             {
@@ -61,7 +80,8 @@ public abstract class ReactiveObserver : IDisposable
         var previous = t_current;
         t_current = this;
 
-        return new TrackingScope(this, previous);
+        scope = new TrackingScope(this, previous);
+        return true;
     }
 
     internal void RecordDependency(ReactiveNode node)

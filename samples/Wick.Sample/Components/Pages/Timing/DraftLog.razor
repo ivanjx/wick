@@ -1,0 +1,14 @@
+@inject DraftState State
+
+<ul class="activity">
+    @foreach (var entry in State.Log)
+    {
+        <li>@entry</li>
+    }
+</ul>
+
+<p class="hint">Written by the autosave effect after each save; renders: <RenderCount Value="++_renders" />.</p>
+
+@code {
+    private int _renders;
+}

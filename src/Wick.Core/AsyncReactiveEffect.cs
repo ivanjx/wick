@@ -20,17 +20,17 @@ internal sealed class AsyncReactiveEffect : ReactiveEffect
     // The first run's self-invalidation is not counted, like a synchronous effect's.
     private int _selfTriggeredRuns = -1;
 
-    private AsyncReactiveEffect(Func<CancellationToken, Task> effect, Action<Exception>? onError, Func<Func<Task>, Task>? dispatcher)
-        : base(onError, dispatcher)
+    private AsyncReactiveEffect(Func<CancellationToken, Task> effect, EffectOptions? options)
+        : base(options)
     {
         _effect = effect;
     }
 
     private protected override bool IsOwnWrite => s_running.Value == this;
 
-    internal static ReactiveEffect Start(Func<CancellationToken, Task> effect, Action<Exception>? onError, Func<Func<Task>, Task>? dispatcher)
+    internal static ReactiveEffect Start(Func<CancellationToken, Task> effect, EffectOptions? options)
     {
-        var instance = new AsyncReactiveEffect(effect, onError, dispatcher);
+        var instance = new AsyncReactiveEffect(effect, options);
 
         // Like a synchronous effect, the first run starts on the calling thread.
         PendingWork.Add();
@@ -41,11 +41,18 @@ internal sealed class AsyncReactiveEffect : ReactiveEffect
 
     private protected override void OnRerunRequested() => CancelRun();
 
-    private protected override void OnDisposed() => CancelRun();
+    // With FlushOnDispose the run in progress completes, like the pending one.
+    private protected override void OnDisposed()
+    {
+        if (!FlushOnDispose)
+        {
+            CancelRun();
+        }
+    }
 
     private protected override void RunScheduled()
     {
-        if (IsDisposed)
+        if (IsStopped)
         {
             StopRunning();
             PendingWork.Remove();
@@ -71,7 +78,7 @@ internal sealed class AsyncReactiveEffect : ReactiveEffect
         lock (_gate)
         {
             // Dispose may have looked for a run to cancel before this one was published.
-            if (IsDisposed)
+            if (IsStopped)
             {
                 return Task.CompletedTask;
             }

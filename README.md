@@ -264,7 +264,7 @@ var effect = Reactive.Effect(() => logger.LogInformation("Filter is now {Filter}
 effect.Dispose();
 ```
 
-An effect runs once immediately and again after each change. Effects may write reactive state. A component effect re-runs on the component's dispatcher, so it can update the UI or call JavaScript directly; `Reactive.Effect` re-runs on the thread pool, or through the `dispatcher` you pass it.
+An effect runs once immediately and again after each change. Effects may write reactive state. A component effect re-runs on the component's dispatcher, so it can update the UI or call JavaScript directly; `Reactive.Effect` re-runs on the thread pool, or through `EffectOptions.Dispatcher`. Pass `EffectOptions` for error handling (`OnError`), the dispatcher and timing.
 
 #### Async effects
 
@@ -284,10 +284,43 @@ protected override void OnInitialized()
 
 - **Tracking:** only reads made before the first `await` are tracked. Read the state you depend on first.
 - **One run at a time:** a change during a run cancels its `token`, and the next run starts once the current one has finished. A slow, outdated run can't overwrite a newer result, provided it observes its token.
-- **Errors:** failures go to `onError`, or to `Reactive.UnhandledEffectException`. A cancelled run's outcome is never reported.
+- **Errors:** failures go to `EffectOptions.OnError`, or to `Reactive.UnhandledEffectException`. A cancelled run's outcome is never reported.
 - **Where it runs:** in a component, re-runs start on the component's dispatcher and their awaits resume there. Disposing the effect, or the component that owns it, cancels the run in progress.
 
 `samples/Wick.Sample` has a search page built this way.
+
+#### Timing: debounce, throttle, flush
+
+By default an effect re-runs right after each change. To wait until changes stop, or to limit how often it runs, set a delay:
+
+```csharp
+protected override void OnInitialized()
+{
+    _autosave = Effect(
+        async token => await storage.SaveAsync(State.Document, token),
+        new EffectOptions { Debounce = TimeSpan.FromSeconds(2), FlushOnDispose = true });
+
+    Effect(RenderPreview, new EffectOptions { Throttle = TimeSpan.FromSeconds(1) });
+}
+
+private Task SaveNowAsync() => _autosave.FlushAsync();
+```
+
+- **`Debounce`** re-runs once the state has been quiet for the delay. Every change restarts the wait.
+- **`Throttle`** runs at most once per interval. The first change after a quiet interval runs right away, and changes within the interval coalesce into one run at its end.
+- **`FlushAsync()`** starts a delayed run now and completes when it has finished. Wire it to a *Save* command.
+- **`FlushOnDispose`** keeps disposal from dropping pending work. A delayed or requested run still happens, once, and a run in progress isn't cancelled. Without it, disposing drops the pending run.
+- The first run is never delayed. `TimeProvider` replaces the clock, for example with a `FakeTimeProvider` in tests.
+
+To debounce a value rather than an effect, use `Reactive.Debounced`, or `Debounced` in a component. It follows its source once the source has stopped changing, and its readers re-render only then:
+
+```csharp
+private Debounced<string> _query = null!;
+
+protected override void OnInitialized() => _query = Debounced(() => State.Query, TimeSpan.FromMilliseconds(300));
+```
+
+`samples/Wick.Sample` has a listener timing page with a debounced autosave, a throttled preview and a debounced value.
 
 ### Changes Wick can't see
 
@@ -360,7 +393,7 @@ public async Task Shows_the_new_count()
 }
 ```
 
-It waits for the whole process, so tests running in parallel can delay it, but never make it return early. It also waits for async effect runs until they complete, so make sure fake APIs used by an effect eventually return.
+It waits for the whole process, so tests running in parallel can delay it, but never make it return early. It also waits for async effect runs until they complete, so make sure fake APIs used by an effect eventually return. A debounced or throttled run counts as pending while it waits, so advance a `FakeTimeProvider` or call `FlushAsync()` before waiting.
 
 ## Diagnostics
 

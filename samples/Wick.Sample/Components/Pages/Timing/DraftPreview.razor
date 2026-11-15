@@ -1,0 +1,17 @@
+@inject DraftState State
+
+<p>@State.Preview</p>
+
+<p class="hint">Settled length: @_settled.Value characters, half a second after typing stops.</p>
+
+<p class="hint">
+    Re-renders with the throttled preview, at most once a second while typing, and when the settled length changes.
+    Renders: <RenderCount Value="++_renders" />.
+</p>
+
+@code {
+    private int _renders;
+    private Debounced<int> _settled = null!;
+
+    protected override void OnInitialized() => _settled = Debounced(() => State.Text.Length, TimeSpan.FromMilliseconds(500));
+}

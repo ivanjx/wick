@@ -82,12 +82,15 @@ public sealed class EffectTests
         var errors = new List<Exception>();
         using var effect = Reactive.Effect(
             () => state.Count++,
-            exception =>
+            new EffectOptions
             {
-                lock (errors)
+                OnError = exception =>
                 {
-                    errors.Add(exception);
-                }
+                    lock (errors)
+                    {
+                        errors.Add(exception);
+                    }
+                },
             });
 
         WaitUntil(() => Snapshot(errors).Length == 1);
@@ -112,7 +115,7 @@ public sealed class EffectTests
                     throw new InvalidOperationException();
                 }
             },
-            exception => reported = exception);
+            new EffectOptions { OnError = exception => reported = exception });
 
         Assert.IsType<InvalidOperationException>(reported);
     }
@@ -133,7 +136,7 @@ public sealed class EffectTests
                     throw new InvalidOperationException();
                 }
             },
-            _ => Interlocked.Increment(ref errors));
+            new EffectOptions { OnError = _ => Interlocked.Increment(ref errors) });
 
         state.Count = 1;
         WaitUntil(() => Volatile.Read(ref errors) == 1);

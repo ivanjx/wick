@@ -12,6 +12,7 @@ builder.Services.AddScoped<GridState>();
 builder.Services.AddScoped<ProfileState>();
 builder.Services.AddScoped<TodoState>();
 builder.Services.AddScoped<SearchState>();
+builder.Services.AddScoped<DraftState>();
 
 // A fake remote API for the search page.
 builder.Services.AddSingleton<LanguageCatalog>();

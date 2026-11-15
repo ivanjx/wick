@@ -1,0 +1,72 @@
+@page "/timing"
+@inject DraftState State
+
+<PageTitle>Listener timing</PageTitle>
+
+<h1>Listener timing</h1>
+<p class="lead">
+    The draft is saved by an asynchronous effect debounced by 1.5 s: it runs once typing pauses, not per keystroke.
+    <em>Save now</em> flushes the pending save with <code>FlushAsync</code>. The effect also flushes on dispose, so
+    leaving the page right after typing still saves the last edit. The preview is refreshed by an effect throttled to
+    once a second, and the settled length is a <code>Debounced</code> value.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <h2>Draft</h2>
+        <DraftEditor />
+        <button @onclick="SaveNowAsync">Save now</button>
+    </div>
+
+    <div class="card">
+        <h2>Preview</h2>
+        <DraftPreview />
+    </div>
+
+    <div class="card">
+        <h2>Saves</h2>
+        <DraftLog />
+    </div>
+</div>
+
+@code {
+    private ReactiveEffect _autosave = null!;
+
+    // Effect runs never overlap, so this plain field is safe.
+    private string _saved = "";
+
+    protected override void OnInitialized()
+    {
+        // Not inside a render, so this read is not tracked.
+        _saved = State.SavedText;
+
+        _autosave = Effect(SaveAsync, new EffectOptions { Debounce = TimeSpan.FromSeconds(1.5), FlushOnDispose = true });
+        Effect(RefreshPreview, new EffectOptions { Throttle = TimeSpan.FromSeconds(1) });
+    }
+
+    private Task SaveNowAsync() => _autosave.FlushAsync();
+
+    private async Task SaveAsync(CancellationToken token)
+    {
+        var text = State.Text;
+        if (text == _saved)
+        {
+            return;
+        }
+
+        // Stands in for a call to storage or an API. Typing during it cancels it; the next save follows the next pause.
+        await Task.Delay(200, token);
+
+        _saved = text;
+        State.SavedText = text;
+        State.AddLog($"Saved {text.Length} characters");
+    }
+
+    private void RefreshPreview()
+    {
+        var text = State.Text;
+        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+
+        State.Preview = $"{words} words, {text.Length} characters, refreshed at {DateTime.Now:HH:mm:ss.f}";
+    }
+}

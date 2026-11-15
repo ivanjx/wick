@@ -11,6 +11,8 @@ namespace Wick.Blazor;
 /// </summary>
 public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsyncDisposable, IReactiveObserverOwner
 {
+    private static readonly EffectOptions s_defaultEffectOptions = new();
+
     private readonly ComponentObserver _observer;
     private int _dirty;
     private int _pendingFlushes;
@@ -42,10 +44,10 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     }
 
     /// <summary>
-    /// Component-owned form of <see cref="Reactive.Effect(Action, Action{Exception}?, Func{Func{Task}, Task}?)"/>: the
-    /// effect is disposed together with the component, so it needs no cleanup in <see cref="Dispose(bool)"/>. It runs
-    /// once immediately on the calling thread and re-runs on the component's dispatcher whenever reactive state it read
-    /// changes, so UI work inside it, such as JavaScript interop, needs no <see cref="ComponentBase.InvokeAsync(Action)"/>.
+    /// Component-owned form of <see cref="Reactive.Effect(Action, EffectOptions?)"/>: the effect is disposed together
+    /// with the component, so it needs no cleanup in <see cref="Dispose(bool)"/>. It runs once immediately on the
+    /// calling thread and re-runs on the component's dispatcher whenever reactive state it read changes, so UI work
+    /// inside it, such as JavaScript interop, needs no <see cref="ComponentBase.InvokeAsync(Action)"/>.
     /// </summary>
     /// <remarks>
     /// The returned effect may be disposed early; disposing it again with the component is harmless. Calling this
@@ -54,33 +56,57 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     /// never re-runs. Safe to call from any thread.
     /// </remarks>
     /// <param name="run">The side effect; reactive state it reads becomes its dependencies.</param>
-    /// <param name="onError">Receives exceptions thrown by runs; see <see cref="Reactive.Effect(Action, Action{Exception}?, Func{Func{Task}, Task}?)"/>.</param>
-    protected ReactiveEffect Effect(Action run, Action<Exception>? onError = null) => Own(Reactive.Effect(run, onError, InvokeAsync));
+    /// <param name="options">
+    /// Error handling and timing, see <see cref="EffectOptions"/>. Without <see cref="EffectOptions.Dispatcher"/>, the
+    /// component's <see cref="ComponentBase.InvokeAsync(Func{Task})"/> is used.
+    /// </param>
+    protected ReactiveEffect Effect(Action run, EffectOptions? options = null) => Own(Reactive.Effect(run, OnDispatcher(options)));
 
     /// <summary>
-    /// Component-owned form of <see cref="Reactive.Effect(Func{CancellationToken, Task}, Action{Exception}?, Func{Func{Task}, Task}?)"/>:
-    /// an asynchronous effect whose re-runs start on the component's dispatcher, so the run and its awaits continue
-    /// there and may call JavaScript interop directly:
+    /// Component-owned form of <see cref="Reactive.Effect(Func{CancellationToken, Task}, EffectOptions?)"/>: an
+    /// asynchronous effect whose re-runs start on the component's dispatcher, so the run and its awaits continue there
+    /// and may call JavaScript interop directly:
     /// <code>
     /// Effect(async token => await JS.InvokeVoidAsync("setTheme", token, Settings.Theme));
     /// </code>
     /// Only reads before the first incomplete <c>await</c> are tracked. A change during a run cancels its token and the
-    /// next run follows once it completed. Disposing the component cancels the run in progress.
+    /// next run follows once it completed. Disposing the component cancels the run in progress, unless
+    /// <see cref="EffectOptions.FlushOnDispose"/> is set.
     /// </summary>
     /// <remarks>
     /// The first run starts on the calling thread, normally the dispatcher in <c>OnInitialized</c>. Disposal follows
     /// the same rules as the synchronous overload.
     /// </remarks>
     /// <param name="run">The side effect, with a token cancelled when the run is superseded or the component disposed.</param>
-    /// <param name="onError">Receives failures of runs; the outcome of a cancelled run is never reported.</param>
-    protected ReactiveEffect Effect(Func<CancellationToken, Task> run, Action<Exception>? onError = null)
-        => Own(Reactive.Effect(run, onError, InvokeAsync));
+    /// <param name="options">
+    /// Error handling and timing, see <see cref="EffectOptions"/>; the outcome of a cancelled run is never reported.
+    /// Without <see cref="EffectOptions.Dispatcher"/>, the component's <see cref="ComponentBase.InvokeAsync(Func{Task})"/> is used.
+    /// </param>
+    protected ReactiveEffect Effect(Func<CancellationToken, Task> run, EffectOptions? options = null)
+        => Own(Reactive.Effect(run, OnDispatcher(options)));
 
     /// <summary>
     /// Asynchronous component-owned effect that does not need a cancellation token; see
-    /// <see cref="Effect(Func{CancellationToken, Task}, Action{Exception}?)"/>.
+    /// <see cref="Effect(Func{CancellationToken, Task}, EffectOptions?)"/>.
     /// </summary>
-    protected ReactiveEffect Effect(Func<Task> run, Action<Exception>? onError = null) => Own(Reactive.Effect(run, onError, InvokeAsync));
+    protected ReactiveEffect Effect(Func<Task> run, EffectOptions? options = null) => Own(Reactive.Effect(run, OnDispatcher(options)));
+
+    /// <summary>
+    /// Component-owned form of <see cref="Reactive.Debounced{T}"/>: a value that follows <paramref name="read"/> once
+    /// it has stopped changing for <paramref name="delay"/>, disposed together with the component.
+    /// </summary>
+    protected Debounced<T> Debounced<T>(Func<T> read, TimeSpan delay, TimeProvider? timeProvider = null)
+        => Own(Reactive.Debounced(read, delay, timeProvider));
+
+    private EffectOptions OnDispatcher(EffectOptions? options)
+    {
+        if (options?.Dispatcher is not null)
+        {
+            return options;
+        }
+
+        return (options ?? s_defaultEffectOptions) with { Dispatcher = InvokeAsync };
+    }
 
     private TOwned Own<TOwned>(TOwned owned)
         where TOwned : IDisposable

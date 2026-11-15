@@ -102,7 +102,7 @@ public sealed class AsyncEffectTests
                     throw new InvalidOperationException("current");
                 }
             },
-            exception => Add(errors, exception));
+            new EffectOptions { OnError = exception => Add(errors, exception) });
 
         state.Count = 1;
         Assert.True(started.Wait(Timeout));
@@ -138,7 +138,7 @@ public sealed class AsyncEffectTests
                     await Task.Delay(System.Threading.Timeout.Infinite, token);
                 }
             },
-            exception => Add(errors, exception));
+            new EffectOptions { OnError = exception => Add(errors, exception) });
 
         state.Count = 1;
         Assert.True(started.Wait(Timeout));
@@ -167,7 +167,7 @@ public sealed class AsyncEffectTests
                 await Task.Yield();
                 state.Count = count + 1;
             },
-            exception => Add(errors, exception));
+            new EffectOptions { OnError = exception => Add(errors, exception) });
 
         WaitUntil(() => Snapshot(errors).Length == 1);
         WaitForIdle();
@@ -188,7 +188,7 @@ public sealed class AsyncEffectTests
                 _ = state.Count;
                 Add(syncRuns, t_inDispatcher);
             },
-            dispatcher: Dispatch);
+            new EffectOptions { Dispatcher = Dispatch });
         using var asyncEffect = Reactive.Effect(
             async () =>
             {
@@ -196,7 +196,7 @@ public sealed class AsyncEffectTests
                 Add(asyncRuns, t_inDispatcher);
                 await Task.Yield();
             },
-            dispatcher: Dispatch);
+            new EffectOptions { Dispatcher = Dispatch });
 
         state.Count = 1;
         WaitUntil(() => Snapshot(syncRuns).Length == 2 && Snapshot(asyncRuns).Length == 2);
@@ -219,8 +219,11 @@ public sealed class AsyncEffectTests
                 Interlocked.Increment(ref runs);
                 await Task.Yield();
             },
-            exception => Add(errors, exception),
-            _ => Task.FromException(new ObjectDisposedException("renderer")));
+            new EffectOptions
+            {
+                OnError = exception => Add(errors, exception),
+                Dispatcher = _ => Task.FromException(new ObjectDisposedException("renderer")),
+            });
 
         state.Count = 1;
         WaitUntil(() => Snapshot(errors).Length == 1);
