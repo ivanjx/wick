@@ -62,6 +62,27 @@ Every component subscribes by hand, must remember to unsubscribe, must marshal t
 
 With Wick, the component just reads the property. Wick records the read, re-renders the component when that property changes, does so on the right dispatcher, and forgets the dependency when the component stops reading it or is disposed.
 
+## How it works
+
+1. While a component renders, Wick records every reactive property it reads.
+2. When one of those properties is set to a different value, the component is scheduled for a re-render on its own dispatcher. The write can come from any thread.
+3. On each render the recorded reads are replaced, so dependencies follow the markup: if an `@if` stops showing a property, changes to it no longer re-render the component.
+
+Re-renders are coalesced: a thousand writes in a row cause a handful of renders, not a thousand.
+
+## Performance
+
+One cell of a rendered grid changes. In the traditional version, the grid subscribes to each cell's change event and calls `InvokeAsync(StateHasChanged)`, the same pattern shown in [Why](#why). With Wick, each cell component just reads `@Cell.Value`. The time is measured from the write until rendering has finished.
+
+| Cells | Approach | Components re-rendered | Time per update | Allocated |
+|------:|----------|-----------------------:|----------------:|----------:|
+| 100 | Traditional | 101 | 23.5 μs | 3,264 B |
+| 100 | Wick | 1 | 1.5 μs | 168 B |
+| 400 | Traditional | 401 | 89.4 μs | 12,864 B |
+| 400 | Wick | 1 | 1.5 μs | 160 B |
+
+The traditional version gets slower as the grid grows; Wick's cost stays flat, because only the changed cell re-renders. Wick's time includes its hop to the thread pool.
+
 ## Getting started
 
 **Requirements:** .NET 10 and C# 14 (the default for `net10.0`).
@@ -69,24 +90,28 @@ With Wick, the component just reads the property. Wick records the read, re-rend
 Add Wick to your repository as a git submodule:
 
 ```sh
-git submodule add https://github.com/ivanjx/wick.git lib/wick
-dotnet sln add lib/wick/src/Wick.Core/Wick.Core.csproj lib/wick/src/Wick.Blazor/Wick.Blazor.csproj lib/wick/src/Wick.Generators/Wick.Generators.csproj lib/wick/src/Wick.CodeFixes/Wick.CodeFixes.csproj
+git submodule add https://github.com/ivanjx/wick.git third_party/wick
+dotnet sln add \
+  third_party/wick/src/Wick.Core/Wick.Core.csproj \
+  third_party/wick/src/Wick.Blazor/Wick.Blazor.csproj \
+  third_party/wick/src/Wick.Generators/Wick.Generators.csproj \
+  third_party/wick/src/Wick.CodeFixes/Wick.CodeFixes.csproj
 ```
 
 Then reference the projects from your Blazor app:
 
 ```xml
 <ItemGroup>
-  <ProjectReference Include="..\lib\wick\src\Wick.Blazor\Wick.Blazor.csproj" />
-  <ProjectReference Include="..\lib\wick\src\Wick.Generators\Wick.Generators.csproj"
+  <ProjectReference Include="..\third_party\wick\src\Wick.Blazor\Wick.Blazor.csproj" />
+  <ProjectReference Include="..\third_party\wick\src\Wick.Generators\Wick.Generators.csproj"
                     OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   <!-- Optional: IDE quick fixes for Wick's warnings. -->
-  <ProjectReference Include="..\lib\wick\src\Wick.CodeFixes\Wick.CodeFixes.csproj"
+  <ProjectReference Include="..\third_party\wick\src\Wick.CodeFixes\Wick.CodeFixes.csproj"
                     OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 </ItemGroup>
 ```
 
-Paths are relative to your app's `.csproj`; adjust them to where it lives. Anyone cloning your repository needs `git clone --recurse-submodules`, or `git submodule update --init` after a plain clone. To move to a newer Wick, run `git submodule update --remote lib/wick` and commit the change.
+Paths are relative to your app's `.csproj`; adjust them to where it lives. Anyone cloning your repository needs `git clone --recurse-submodules`, or `git submodule update --init` after a plain clone. To move to a newer Wick, run `git submodule update --remote third_party/wick` and commit the change.
 
 **1. Make components reactive.** Add this to `_Imports.razor` so every component inherits it:
 
@@ -113,63 +138,147 @@ public partial class TodoState
 **3. Register and use it** like any other service:
 
 ```csharp
-builder.Services.AddScoped<TodoState>();      // one per circuit (browser tab)
-builder.Services.AddSingleton<MarketState>(); // shared by everyone
-```
-
-## How it works
-
-1. While a component renders, Wick records every reactive property it reads.
-2. When one of those properties is set to a different value, the component is scheduled for a re-render on its own dispatcher. The write can come from any thread.
-3. On each render the recorded reads are replaced, so dependencies follow the markup: if an `@if` stops showing a property, changes to it no longer re-render the component.
-
-Re-renders are coalesced: a thousand writes in a row cause a handful of renders, not a thousand.
-
-## Performance
-
-One cell of a rendered grid changes. In the traditional version, the grid subscribes to each cell's change event and calls `InvokeAsync(StateHasChanged)`, the same pattern shown in [Why](#why). With Wick, each cell component just reads `@Cell.Value`. The time is measured from the write until rendering has finished.
-
-| Cells | Approach | Components re-rendered | Time per update | Allocated |
-|------:|----------|-----------------------:|----------------:|----------:|
-| 100 | Traditional | 101 | 23.5 μs | 3,264 B |
-| 100 | Wick | 1 | 1.5 μs | 168 B |
-| 400 | Traditional | 401 | 89.4 μs | 12,864 B |
-| 400 | Wick | 1 | 1.5 μs | 160 B |
-
-The traditional version gets slower as the grid grows; Wick's cost stays flat, because only the changed cell re-renders. Wick's time includes its hop to the thread pool.
-
-Measured with BenchmarkDotNet using a headless Blazor `Renderer`, so browser and network time are not included. Absolute numbers depend on the machine. To reproduce:
-
-```sh
-dotnet run -c Release --project benchmarks/Wick.Benchmarks -- --filter '*GridRender*'
+builder.Services.AddScoped<TodoState>();            // one per circuit (browser tab)
+builder.Services.AddSingleton<AnnouncementState>(); // shared by everyone
 ```
 
 ## Guide
 
-### Computed properties
+### The basics
 
-Plain C# properties that read reactive ones just work. Whoever reads `Doubled` depends on `Count`:
+Declare state with `[ReactiveState]` and `partial` properties:
 
 ```csharp
-public int Doubled => Count * 2;
+[ReactiveState]
+public partial class CounterState
+{
+    public partial int Count { get; set; }
+}
 ```
 
-### Nested state
+Inject it into a component to read and write it. Whatever the component reads while rendering is what it depends on:
 
-Reactive objects can contain reactive objects. Each property of each object is tracked on its own, so `<p>@State.User.Name</p>` re-renders when `Name` changes or when `User` is replaced, and not when `User.Email` changes.
+```razor
+@inject CounterState State
+
+<p>@State.Count</p>
+<button @onclick="() => State.Count++">+</button>
+```
+
+The component re-renders after a click because it read `Count` during its last render. The same write works from any thread, such as a timer, a `BackgroundService` or a SignalR callback.
+
+Reactive objects can contain reactive objects, and each component depends only on the properties it reads:
+
+```csharp
+[ReactiveState]
+public partial class ProfileState
+{
+    public partial User User { get; set; } = new();
+}
+
+[ReactiveState]
+public partial class User
+{
+    public partial string Name { get; set; } = "";
+
+    public partial string Email { get; set; } = "";
+}
+```
+
+```razor
+@* NameDisplay.razor *@
+@inject ProfileState State
+
+<p>@State.User.Name</p>
+```
+
+```razor
+@* EmailDisplay.razor *@
+@inject ProfileState State
+
+<p>@State.User.Email</p>
+```
+
+Changing `Name` re-renders `NameDisplay` alone, and changing `Email` re-renders `EmailDisplay` alone. Replacing `User` re-renders both.
+
+### Local component state
+
+State that belongs to one component doesn't need a service. In a `@code` block, use `ReactiveValue<T>`; the source generator can't see partial properties declared in a `.razor` file:
+
+```razor
+@inject NavigationManager Nav
+
+<p>You are at @_location.Value</p>
+
+@code {
+    private readonly ReactiveValue<string> _location = new("");
+
+    protected override void OnInitialized()
+    {
+        _location.Value = Nav.Uri; // Load the initial value.
+        Nav.LocationChanged += (_, e) => _location.Value = e.Location;
+    }
+}
+```
+
+A write from the event re-renders the component, without `InvokeAsync` or `StateHasChanged`.
+
+The same component in a code-behind file can be a `[ReactiveState]` type itself, so `Location` becomes a `partial` property. Properties set by Blazor (`[Parameter]`, `[CascadingParameter]`, `[Inject]`, `[SupplyParameterFrom...]`) stay plain auto-properties:
+
+```csharp
+[ReactiveState]
+public partial class PageLocation
+{
+    [Inject]
+    public NavigationManager Nav { get; set; } = default!;
+
+    public partial string Location { get; set; } = "";
+
+    protected override void OnInitialized()
+    {
+        Location = Nav.Uri; // Load the initial value.
+        Nav.LocationChanged += (_, e) => Location = e.Location;
+    }
+}
+```
 
 ### When a write notifies
 
-A write of a value equal to the current one, by `EqualityComparer<T>.Default`, is ignored. For a large string or record that comparison costs a full scan per write, and your logic may care about identity anyway. `[ReactiveEquality]` changes it per property:
+A write notifies readers only if the new value differs from the current one. Equal values are ignored, compared with `EqualityComparer<T>.Default`:
 
 ```csharp
-[ReactiveEquality(ReactiveEqualityMode.Reference)] // a new instance notifies, without comparing contents
-public partial string Content { get; set; } = "";
+State.Count = 5; // differs from the old value: readers re-render
+State.Count = 5; // same value: nothing happens
+```
 
-[ReactiveEquality(ReactiveEqualityMode.Never)]     // every write notifies, even of the same value
-public partial int Pulse { get; set; }
+That is right for most properties. `[ReactiveEquality]` changes the comparison per property, for the cases where it isn't.
 
-[ReactiveEquality(typeof(IgnoreCaseComparer))]     // any IEqualityComparer<T> with a parameterless constructor
+**`Reference`**: notify when a different instance is written, without comparing contents. For a large string or record, the default comparison scans all of it on every write.
+
+```csharp
+[ReactiveEquality(ReactiveEqualityMode.Reference)]
+public partial string ResponseBody { get; set; } = "";
+```
+
+```csharp
+State.ResponseBody = await Api.GetReportAsync(); // notifies, even if the text is identical
+```
+
+**`Never`**: every write notifies, even of the same value. Use it when writing the value again means something, such as showing the same message a second time:
+
+```csharp
+[ReactiveEquality(ReactiveEqualityMode.Never)]
+public partial string StatusMessage { get; set; } = "";
+```
+
+```csharp
+State.StatusMessage = "Saved"; // each save notifies, so a second "Saved" shows again
+```
+
+**A comparer**: any `IEqualityComparer<T>` with a parameterless constructor decides what counts as equal. Here, a search box ignores changes of letter case, so `"wick"` to `"Wick"` doesn't search again:
+
+```csharp
+[ReactiveEquality(typeof(IgnoreCaseComparer))]
 public partial string Search { get; set; } = "";
 ```
 
@@ -181,122 +290,46 @@ Mutating a `List<T>` in place is invisible to Wick (and the compiler warns about
 
 ```csharp
 public ReactiveList<TodoItem> Items { get; } = [];
-public ReactiveDictionary<string, decimal> Prices { get; } = new();
+public ReactiveDictionary<string, int> Quantities { get; } = new();
 public ReactiveSet<string> SelectedIds { get; } = [];
 ```
 
 ```csharp
 State.Items.Add(item);          // re-renders components that enumerate or count the list
-State.Prices["AAPL"] = 191.20m; // re-renders components that read "AAPL", not other keys
-State.SelectedIds.Add("42");    // re-renders components that asked Contains("42") or enumerate the set
+State.Quantities["42"] = 3;     // re-renders components that read "42", not other keys
+State.SelectedIds.Add("42");    // re-renders readers of Contains("42") or the whole set
 ```
 
 All three are thread-safe, and enumerating them while another thread writes is safe. `Snapshot()` returns a consistent `ImmutableArray<T>`. Replacing an immutable collection (`Items = Items.Add(item)`) also works.
 
 Arrays are fine as long as you replace them (`Cells = [.. cells]`). Writing one element in place (`State.Cells[i] = x`) is not tracked, and the compiler warns about it.
 
-#### Reacting to what changed: `Changes`
-
-A reader of a collection learns *that* it changed. To act on *what* changed, for example to call JavaScript once per added item, watch its `Changes`. In a component, `Watch` calls the handler on the component's dispatcher and stops with the component:
-
-```csharp
-public partial class ToastHost : ReactiveComponentBase
-{
-    [Inject] private IJSRuntime JS { get; set; } = default!;
-    [Inject] private ToastState Toasts { get; set; } = default!;
-
-    private readonly List<string> _toShow = [];
-
-    protected override void OnInitialized()
-    {
-        Watch(Toasts.Items.Changes, changes =>
-        {
-            foreach (var change in changes)
-            {
-                if (change.Kind == CollectionChangeKind.Added)
-                {
-                    _toShow.Add(change.Item.Id);
-                }
-            }
-
-            // _toShow isn't reactive: render, so that the new toasts exist when OnAfterRenderAsync shows them.
-            StateHasChanged();
-        });
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        string[] ids = [.. _toShow];
-        _toShow.Clear();
-
-        foreach (var id in ids)
-        {
-            await JS.InvokeVoidAsync("toast.show", id);
-        }
-    }
-}
-```
-
-Outside components, use `Reactive.Watch(State.Items.Changes, changes => ...)` and dispose it with its owner.
-
-- **What you get:**
-  - `ReactiveList<T>` delivers `ListChange<T>`: `Added`, `Removed`, `Replaced` and `Moved`, with the item and its indices. `Clear` and `ReplaceAll` are a `Reset` carrying the new `Items`. Applying the changes in order to a copy reproduces the list.
-  - `ReactiveSet<T>` delivers `SetChange<T>`: `Added` and `Removed`.
-  - `ReactiveDictionary<TKey, TValue>` delivers `DictionaryChange<TKey, TValue>`: `Added`, `Replaced` (with `OldValue`) and `Removed`.
-  - A set or dictionary reports `Clear` and the bulk operations as one change per item.
-- **Nothing is dropped or merged:** each call receives every change made since the previous call, in order, and never an empty list. Two adds are two `Added` changes, even when one call delivers both.
-- **Batches:** the changes made in a `Reactive.Batch` or `BatchAsync` arrive together, in one call, once it has ended.
-- **Everything else** works as for [`Watch`](#reacting-to-changes-watch): it starts with the next change, the handler runs untracked and may write state, and `EffectOptions` set the dispatcher, error handling, debounce or throttle.
-- **Cost:** changes are recorded only while watched. A collection nobody watches records nothing.
-
-`samples/Wick.Sample` logs the todo items added and removed with a collection watch.
-
-### Local component state
-
-State that belongs to one component doesn't need a service. In a `@code` block, use `ReactiveValue<T>`; the source generator can't see partial properties declared in a `.razor` file:
-
-```razor
-<p>@_count.Value</p>
-<button @onclick="() => _count.Value++">+</button>
-
-@code {
-    private readonly ReactiveValue<int> _count = new(0);
-}
-```
-
-A write from any thread (a timer, a callback after an `await`) re-renders the component without `InvokeAsync` or `StateHasChanged`. Pass the value to a child component (`<CountDisplay Count="_count" />`) and only the child that reads `Count.Value` re-renders when it changes; the parent doesn't. The reactive collections and `Reactive.Derived` work as component fields too. The optional second argument names the value in [diagnostics](#why-did-this-re-render): `new(0, "Counter.Count")`.
-
-In a code-behind file, the component itself can be a `[ReactiveState]` type. Properties set by Blazor (`[Parameter]`, `[CascadingParameter]`, `[Inject]`, `[SupplyParameterFrom...]`) stay plain auto-properties:
-
-```csharp
-[ReactiveState]
-public partial class Counter
-{
-    [Parameter]
-    public int Step { get; set; } = 1;
-
-    public partial int Count { get; set; }
-}
-```
-
 ### Batching
 
-Several writes that belong together can be grouped so readers re-render once:
+Writes that belong together can be grouped, so readers re-render once and never see half of the change. `Reactive.Batch` holds back notifications until it returns:
 
 ```csharp
+State.Loading = true;                // notifies now: the spinner shows
+var items = await api.LoadAsync();
+
 Reactive.Batch(() =>
 {
-    State.FirstName = "Ada";
-    State.LastName = "Lovelace";
-});
-
-await Reactive.BatchAsync(async () =>
-{
-    State.Loading = true;
-    State.Items.ReplaceAll(await api.LoadAsync());
-    State.Loading = false;
+    State.Items.ReplaceAll(items);   // the list and the spinner change
+    State.Loading = false;           // together, in one render
 });
 ```
+
+To group writes made across `await`s, use `Reactive.BatchAsync`. Readers are notified when it completes and see nothing before that, so keep the awaited work short and set a loading flag outside the batch:
+
+```csharp
+await Reactive.BatchAsync(async () =>
+{
+    State.Orders.ReplaceAll(await api.LoadOrdersAsync());
+    State.OrdersTotal = await api.LoadTotalAsync();
+});
+```
+
+Readers never see the new orders next to the old total.
 
 Within a single synchronous Blazor event handler you rarely need this: renders are already coalesced.
 
@@ -305,14 +338,17 @@ Within a single synchronous Blazor event handler you rarely need this: renders a
 A computed property runs on every read. When the computation is expensive, or many components read it, cache it with `Reactive.Derived`:
 
 ```csharp
-private readonly Derived<double> _average;
+public ReactiveList<CartItem> Items { get; } = [];
 
-public MarketState()
+private readonly Derived<decimal> _total;
+
+public CartState()
 {
-    _average = Reactive.Derived(() => Tickers.Average(ticker => ticker.Price));
+    _total = Reactive.Derived(() =>
+        Items.Sum(item => item.Price * item.Quantity));
 }
 
-public double AveragePrice => _average.Value;
+public decimal Total => _total.Value;
 ```
 
 The value is recomputed once when its inputs change, and its readers re-render only if the result actually changed.
@@ -331,7 +367,8 @@ protected override void OnInitialized()
 Outside components (in a state class or a service), use `Reactive.Effect` and dispose it when its owner goes away:
 
 ```csharp
-var effect = Reactive.Effect(() => logger.LogInformation("Filter is now {Filter}", State.Filter));
+var effect = Reactive.Effect(() =>
+    logger.LogInformation("Filter is now {Filter}", State.Filter));
 
 // When the owner is disposed:
 effect.Dispose();
@@ -349,8 +386,7 @@ protected override void OnInitialized()
     Effect(async token =>
     {
         var query = State.Query;
-        var results = await Api.SearchAsync(query, token);
-        State.Results = results;
+        State.Results = await Api.SearchAsync(query, token);
     });
 }
 ```
@@ -370,10 +406,19 @@ By default an effect re-runs right after each change. To wait until changes stop
 protected override void OnInitialized()
 {
     _autosave = Effect(
-        async token => await storage.SaveAsync(State.Document, token),
-        new EffectOptions { Debounce = TimeSpan.FromSeconds(2), FlushOnDispose = true });
+        async token => await Api.SaveDraftAsync(State.Draft, token),
+        new EffectOptions
+        {
+            Debounce = TimeSpan.FromSeconds(2),
+            FlushOnDispose = true
+        });
 
-    Effect(RenderPreview, new EffectOptions { Throttle = TimeSpan.FromSeconds(1) });
+    Effect(
+        RenderPreview,
+        new EffectOptions
+        {
+            Throttle = TimeSpan.FromSeconds(1)
+        });
 }
 
 private Task SaveNowAsync() => _autosave.FlushAsync();
@@ -390,10 +435,42 @@ To debounce a value rather than an effect, use `Reactive.Debounced`, or `Debounc
 ```csharp
 private Debounced<string> _query = null!;
 
-protected override void OnInitialized() => _query = Debounced(() => State.Query, TimeSpan.FromMilliseconds(300));
+protected override void OnInitialized()
+{
+    _query = Debounced(
+        () => State.Query,
+        TimeSpan.FromMilliseconds(300));
+}
 ```
 
 `samples/Wick.Sample` has a listener timing page with a debounced autosave, a throttled preview and a debounced value.
+
+#### Reacting to changes: `Watch`
+
+An effect acts on the current state, so it runs at startup too. To react only to a *change*, and to see the value it replaces, use `Reactive.Watch`, or `Watch` in a component:
+
+```csharp
+protected override void OnInitialized()
+{
+    Watch(
+        () => Auth.CurrentUser,
+        (user, previous) => Cart.Clear());
+
+    // Saves after edits only, not when the page opens.
+    Watch(
+        () => State.Draft,
+        async (draft, _, token) => await Api.SaveDraftAsync(draft, token),
+        new EffectOptions
+        {
+            Debounce = TimeSpan.FromSeconds(2),
+            FlushOnDispose = true
+        });
+}
+```
+
+- **Tracking:** only the source is tracked. The handler runs untracked and may write state.
+- **Changes:** the handler runs only when the source's value differs from the previous one. Pass an `IEqualityComparer<T>` to decide what counts as a change. Values the source had only between two runs are skipped, for example within a debounce.
+- **Everything else** works as for effects: the returned `ReactiveEffect`, `EffectOptions`, async handlers with a token, and the component's dispatcher.
 
 #### Re-running an effect
 
@@ -409,27 +486,6 @@ private void Refresh() => _usersLoad.Rerun();
 
 `Rerun()` behaves like a change of state the effect read: a run in progress is cancelled, runs never overlap, requests made before the next run coalesce with changes into one run, and `Debounce` and `Throttle` apply. To run a delayed effect now, chain `effect.Rerun(); await effect.FlushAsync();`. On a disposed effect, `Rerun()` does nothing. A `Watch` re-evaluates its source and still calls the handler only when the value changed.
 
-#### Reacting to changes: `Watch`
-
-An effect acts on the current state, so it runs at startup too. To react only to a *change*, and to see the value it replaces, use `Reactive.Watch`, or `Watch` in a component:
-
-```csharp
-protected override void OnInitialized()
-{
-    Watch(() => Auth.CurrentUser, (user, previous) => Cart.Clear());
-
-    // Saves after edits only, not when the page opens.
-    Watch(
-        () => State.Document,
-        async (document, _, token) => await storage.SaveAsync(document, token),
-        new EffectOptions { Debounce = TimeSpan.FromSeconds(2), FlushOnDispose = true });
-}
-```
-
-- **Tracking:** only the source is tracked. The handler runs untracked and may write state.
-- **Changes:** the handler runs only when the source's value differs from the previous one. Pass an `IEqualityComparer<T>` to decide what counts as a change. Values the source had only between two runs are skipped, for example within a debounce.
-- **Everything else** works as for effects: the returned `ReactiveEffect`, `EffectOptions`, async handlers with a token, and the component's dispatcher.
-
 #### Untracked reads
 
 To read state without depending on it, wrap the read in `Reactive.Untracked`. The effect below re-runs when the message changes, not when the language does:
@@ -439,6 +495,72 @@ Effect(() => Notify(State.Message, Reactive.Untracked(() => Settings.Language)))
 ```
 
 `Untracked` doesn't lift the rule against writes during a render.
+
+#### Reacting to what changed: `Changes`
+
+A reader of a collection learns *that* it changed. To act on *what* changed, for example to scroll a chat to the newest message, watch its `Changes`. In a component, `Watch` calls the handler on the component's dispatcher and stops with the component:
+
+```csharp
+public partial class ChatPanel : ReactiveComponentBase
+{
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private ChatState Chat { get; set; } = default!;
+
+    private readonly ReactiveValue<string?> _newestId = new(null);
+    private string? _scrolledId;
+
+    protected override void OnInitialized()
+    {
+        Watch(Chat.Messages.Changes, changes =>
+        {
+            foreach (var change in changes)
+            {
+                if (change.Kind == CollectionChangeKind.Added)
+                {
+                    // Remember the newest message, to scroll to it after the render.
+                    _newestId.Value = change.Item.Id;
+                }
+            }
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        string? id = _newestId.Value;
+
+        // Scroll to the newest message once it is rendered, but only once per message.
+        if (id is not null && id != _scrolledId)
+        {
+            _scrolledId = id;
+
+            await JS.InvokeVoidAsync("chat.scrollIntoView", id);
+        }
+    }
+}
+```
+
+```razor
+@foreach (var message in Chat.Messages)
+{
+    <p id="@message.Id" class="@(message.Id == _newestId.Value ? "new" : null)">@message.Text</p>
+}
+```
+
+The markup reads `_newestId`, so setting it re-renders the panel, and `OnAfterRenderAsync` runs once the new message is in the DOM. No `StateHasChanged` is needed.
+
+Outside components, use `Reactive.Watch(State.Items.Changes, changes => ...)` and dispose it with its owner.
+
+- **What you get:**
+  - `ReactiveList<T>` delivers `ListChange<T>`: `Added`, `Removed`, `Replaced` and `Moved`, with the item and its indices. `Clear` and `ReplaceAll` are a `Reset` carrying the new `Items`. Applying the changes in order to a copy reproduces the list.
+  - `ReactiveSet<T>` delivers `SetChange<T>`: `Added` and `Removed`.
+  - `ReactiveDictionary<TKey, TValue>` delivers `DictionaryChange<TKey, TValue>`: `Added`, `Replaced` (with `OldValue`) and `Removed`.
+  - A set or dictionary reports `Clear` and the bulk operations as one change per item.
+- **Nothing is dropped or merged:** each call receives every change made since the previous call, in order, and never an empty list. Two adds are two `Added` changes, even when one call delivers both.
+- **Batches:** the changes made in a `Reactive.Batch` or `BatchAsync` arrive together, in one call, once it has ended.
+- **Everything else** works as for [`Watch`](#reacting-to-changes-watch): it starts with the next change, the handler runs untracked and may write state, and `EffectOptions` set the dispatcher, error handling, debounce or throttle.
+- **Cost:** changes are recorded only while watched. A collection nobody watches records nothing.
+
+`samples/Wick.Sample` logs the todo items added and removed with a collection watch.
 
 ### Changes Wick can't see
 
@@ -527,12 +649,10 @@ public partial class SettingsState
 
 Wick declares the event and a `protected virtual void OnPropertyChanged(string propertyName)` (private in a sealed class). If the class already implements `INotifyPropertyChanged`, Wick calls its `OnPropertyChanged(string)` instead. Reactive subclasses of a notifying class raise the event too.
 
-The analyzers help with the rest:
+The analyzers described under [Diagnostics](#diagnostics) help with the rest:
 
-- **WK0012** points out classes using the toolkit's `[ObservableProperty]`. Its quick fix turns `[ObservableProperty] private string _language = "en";` into `public partial string Language { get; set; } = "en";` (`[property: ...]` attributes move to the property), removes the `ObservableObject` base and adds `[ReactiveState]`, with or without `NotifyPropertyChanged = true`. It's offered only when the class uses nothing else from the toolkit: no `[NotifyPropertyChangedFor]` or other toolkit attributes, no `OnLanguageChanged` hooks, no `SetProperty` or `OnPropertyChanged` calls, and no direct use of the fields.
-- **WK0011** points out `State.PropertyChanged += ...` in a reactive component when the handler only calls `StateHasChanged()` or `InvokeAsync(StateHasChanged)`, possibly behind a check of `e.PropertyName`. The component already re-renders when state it rendered changes. The quick fix removes the subscription, the matching `-=` and the handler if nothing else uses it. It's reported only when the event is the one Wick generates and no hand-written code raises it. A component that hands this state to non-reactive child content needs [`<ReactiveRegion>`](#content-passed-into-non-reactive-components) there.
-- **WK0014** (off by default) points out remaining `StateHasChanged()` calls in reactive components. Turn it on with `dotnet_diagnostic.WK0014.severity = suggestion` in `.editorconfig`.
-- **WK0013** warns when another source generator (CommunityToolkit.Mvvm, ReactiveUI, `[GeneratedRegex]`) implements a partial property of a reactive type. Wick leaves that property to the other generator, so it isn't reactive.
+- **WK0012** turns `[ObservableProperty] private string _language = "en";` into `public partial string Language { get; set; } = "en";` (`[property: ...]` attributes move to the property), removes the `ObservableObject` base and adds `[ReactiveState]`, with or without `NotifyPropertyChanged = true`. It's offered only when the class uses nothing else from the toolkit: no `[NotifyPropertyChangedFor]` or other toolkit attributes, no `OnLanguageChanged` hooks, no `SetProperty` or `OnPropertyChanged` calls, and no direct use of the fields.
+- **WK0011** removes a `State.PropertyChanged += ...` subscription whose handler only calls `StateHasChanged()` or `InvokeAsync(StateHasChanged)`, possibly behind a check of `e.PropertyName`, together with the matching `-=` and the handler if nothing else uses it. It's reported only when the event is the one Wick generates and no hand-written code raises it. A component that hands this state to non-reactive child content needs [`<ReactiveRegion>`](#content-passed-into-non-reactive-components) there.
 
 ## Diagnostics
 
@@ -558,51 +678,20 @@ WK0001, WK0002, WK0006, WK0007, WK0011 and WK0012 come with IDE quick fixes: add
 
 Warnings can be suppressed with `#pragma warning disable` or in `.editorconfig`.
 
-## Sample apps
+WK0014 is off by default. Turn it on with `dotnet_diagnostic.WK0014.severity = suggestion` in `.editorconfig`.
 
-`samples/Wick.Sample` (Interactive Server) shows every feature, with render counters on each component so you can see exactly what re-renders:
+## How to
 
-```sh
-dotnet run --project samples/Wick.Sample
-```
-
-Then open http://localhost:5080. Pages include a counter written from several threads, a 400-cell grid next to the classic event pattern, a live market fed by a background service, nested state, a todo list, and reactive regions.
-
-`samples/Wick.Sample.Wasm` is a smaller WebAssembly app: a background loop, a derived value, a component-owned effect and a batch, all on the browser's single thread.
-
-```sh
-dotnet run --project samples/Wick.Sample.Wasm
-```
-
-`samples/Wick.Sample.WinForms` is a Blazor Hybrid app for Windows: native WinForms controls next to a `BlazorWebView`, both over the same state. The Blazor cards re-render through Wick; the native labels are set by `Reactive.Effect`s that marshal to the UI thread. Click either side and both update.
-
-```sh
-dotnet run --project samples/Wick.Sample.WinForms
-```
-
-## Repository layout
-
-| Path | Contents |
-|------|----------|
-| `src/Wick.Core` | Reactive state, collections, derived values, effects, batching. No Blazor dependency. |
-| `src/Wick.Blazor` | `ReactiveComponentBase`, `ReactiveLayoutComponentBase`, `ReactiveRegion` |
-| `src/Wick.Generators` | Source generator for `[ReactiveState]` and the analyzers |
-| `src/Wick.CodeFixes` | IDE quick fixes for the analyzer warnings |
-| `tests/` | Unit, generator and bUnit component tests |
-| `tests/Wick.E2E.*` | Browser end-to-end tests: a Blazor Web App host driven by Playwright in Interactive Server and WebAssembly modes |
-| `samples/Wick.Sample` | Interactive Server demo app |
-| `samples/Wick.Sample.Wasm` | WebAssembly demo app |
-| `samples/Wick.Sample.WinForms` | Blazor Hybrid (WinForms) demo app |
-| `benchmarks/Wick.Benchmarks` | BenchmarkDotNet benchmarks, including a grid render comparison with the classic event pattern |
-
-Build and test:
+### Build and test
 
 ```sh
 dotnet build Wick.slnx
 dotnet test --solution Wick.slnx
 ```
 
-The end-to-end tests drive the browser already installed on the machine (Edge on Windows, Chrome elsewhere), so Playwright doesn't download one. To run only them:
+### Run only the end-to-end tests
+
+They drive the browser already installed on the machine (Edge on Windows, Chrome elsewhere), so Playwright doesn't download one:
 
 ```sh
 dotnet test --project tests/Wick.E2E.Tests
