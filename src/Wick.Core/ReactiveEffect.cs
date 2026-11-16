@@ -19,6 +19,9 @@ namespace Wick.Core;
 /// <see cref="EffectOptions.Debounce"/> and <see cref="EffectOptions.Throttle"/> delay re-runs, never the first run. <see cref="FlushAsync"/>
 /// starts a delayed run right away.
 /// </para>
+/// <para>
+/// <see cref="Rerun"/> requests a run without a change, for example to reload data on a <em>Refresh</em> button.
+/// </para>
 /// </remarks>
 public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
 {
@@ -47,6 +50,9 @@ public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
     // Only for debounced and throttled effects. Never disposed: arming it may race with Dispose, every callback checks
     // the state first, and an unarmed timer holds nothing.
     private readonly ITimer? _timer;
+
+    // Notified by Rerun; created on first use and subscribed for the effect's lifetime, outside the tracked reads.
+    private ReactiveNode? _rerunSignal;
 
     // The creating thread runs the first run.
     private int _state = Running;
@@ -120,6 +126,29 @@ public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
         ResolveDelayedRunAfterDispose();
 
         OnDisposed();
+    }
+
+    /// <summary>
+    /// Requests a run as if state the effect read had changed: an asynchronous run in progress is cancelled and the
+    /// next run follows once it completed, <see cref="EffectOptions.Debounce"/> and <see cref="EffectOptions.Throttle"/>
+    /// apply, and requests made inside a batch wait for it to end. Does nothing once the effect is disposed.
+    /// </summary>
+    /// <remarks>
+    /// Several requests, or requests and changes, made before the next run starts coalesce into that run. Called from
+    /// the effect's own run, it counts as a self-triggered run, see <see cref="MaxConsecutiveSelfTriggeredRuns"/>.
+    /// A watch re-evaluates its source and still calls its handler only when the value changed. To run a debounced or
+    /// throttled effect now, follow with <see cref="FlushAsync"/>. Like a write, it is not allowed during a render or
+    /// the computation of a derived value.
+    /// </remarks>
+    public void Rerun()
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        // Through a node, so the request takes the same path as a change: batched, then delivered to the observer.
+        GetRerunSignal().Notify();
     }
 
     /// <summary>
@@ -254,6 +283,22 @@ public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
         {
             return _timeProvider.CreateTimer(static effect => ((ReactiveEffect)effect!).OnTimer(), this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
+    }
+
+    private ReactiveNode GetRerunSignal()
+    {
+        var signal = Volatile.Read(ref _rerunSignal);
+        if (signal is not null)
+        {
+            return signal;
+        }
+
+        // Subscribed directly rather than read in a run, so tracking never drops it. A node that loses the race is
+        // simply discarded together with its subscription.
+        signal = new ReactiveNode("ReactiveEffect.Rerun");
+        signal.Subscribe(_observer);
+
+        return Interlocked.CompareExchange(ref _rerunSignal, signal, null) ?? signal;
     }
 
     private void MarkRunStart()

@@ -395,6 +395,20 @@ protected override void OnInitialized() => _query = Debounced(() => State.Query,
 
 `samples/Wick.Sample` has a listener timing page with a debounced autosave, a throttled preview and a debounced value.
 
+#### Re-running an effect
+
+An effect re-runs when state it read changes. To run it again without a change, for a *Refresh* button or data that went stale on the server, keep the returned `ReactiveEffect` and call `Rerun()`:
+
+```csharp
+private ReactiveEffect _usersLoad = null!;
+
+protected override void OnInitialized() => _usersLoad = Effect(LoadUsersAsync);
+
+private void Refresh() => _usersLoad.Rerun();
+```
+
+`Rerun()` behaves like a change of state the effect read: a run in progress is cancelled, runs never overlap, requests made before the next run coalesce with changes into one run, and `Debounce` and `Throttle` apply. To run a delayed effect now, chain `effect.Rerun(); await effect.FlushAsync();`. On a disposed effect, `Rerun()` does nothing. A `Watch` re-evaluates its source and still calls the handler only when the value changed.
+
 #### Reacting to changes: `Watch`
 
 An effect acts on the current state, so it runs at startup too. To react only to a *change*, and to see the value it replaces, use `Reactive.Watch`, or `Watch` in a component:

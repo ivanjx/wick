@@ -1,0 +1,18 @@
+@* Owns an effect that a Refresh button re-runs; logs whether each run executes on the renderer's dispatcher. *@
+@inherits ReactiveComponentBase
+@using System.Collections.Concurrent
+@using Wick.Core
+@inject AppState State
+@inject RenderProbe Probe
+<button id="refresh" @onclick="Refresh">refresh</button>
+
+@code {
+    private readonly ConcurrentQueue<string> _log = new();
+    private ReactiveEffect _load = null!;
+
+    public string[] Log => [.. _log];
+
+    protected override void OnInitialized() => _load = Effect(() => _log.Enqueue($"load {State.Count} {Probe.Dispatcher!.CheckAccess()}"));
+
+    private void Refresh() => _load.Rerun();
+}

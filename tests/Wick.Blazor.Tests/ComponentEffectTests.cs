@@ -202,6 +202,20 @@ public sealed class ComponentEffectTests : ReactiveTestContext
         AssertNoMoreRuns(() => view.Log.Length, expected: 0);
     }
 
+    [Fact]
+    public void Rerunning_an_owned_effect_from_an_event_handler_re_runs_it_on_the_component_dispatcher()
+    {
+        var cut = Render<RerunEffectView>();
+        var view = cut.Instance;
+
+        cut.Find("#refresh").Click();
+
+        Assert.True(SpinWait.SpinUntil(() => view.Log.Length == 2, Timeout));
+        Settle(view);
+
+        Assert.Equal(["load 0 True", "load 0 True"], view.Log);
+    }
+
     /// <summary>Effects re-run asynchronously, so give a run that should not happen time to show up.</summary>
     private static void AssertNoMoreRuns(Func<int> runs, int expected)
     {
