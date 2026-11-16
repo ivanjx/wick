@@ -27,6 +27,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     private const string CountNodeName = "ReactiveDictionary<TKey, TValue>.Count";
     private const string EntriesNodeName = "ReactiveDictionary<TKey, TValue>";
     private const string KeyNodeName = "ReactiveDictionary[key]";
+    private const string ChangesNodeName = "ReactiveDictionary<TKey, TValue>.Changes";
 
     private readonly Lock _gate = new();
     private readonly Dictionary<TKey, TValue> _entries;
@@ -34,6 +35,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     private KeyValuePair<TKey, TValue>[]? _snapshot;
     private ReactiveNode? _countNode;
     private ReactiveNode? _entriesNode;
+    private CollectionChanges<DictionaryChange<TKey, TValue>>? _changes;
 
     public ReactiveDictionary(IEqualityComparer<TKey>? comparer = null)
     {
@@ -77,6 +79,26 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => Keys;
 
     IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => Values;
+
+    /// <summary>
+    /// The changes made to the dictionary from now on, in order, for
+    /// <see cref="Reactive.Watch{TChange}(CollectionChanges{TChange}, Action{IReadOnlyList{TChange}}, EffectOptions?)"/>:
+    /// <c>Reactive.Watch(dictionary.Changes, changes =&gt; ...)</c>. <see cref="Clear"/> reports one removal per entry.
+    /// </summary>
+    /// <remarks>Reading it is not tracked. Changes are recorded only while watched.</remarks>
+    public CollectionChanges<DictionaryChange<TKey, TValue>> Changes
+        => Volatile.Read(ref _changes) ?? CreateChanges();
+
+    /// <summary>The change stream while watched, else null; read under the lock, before recording.</summary>
+    private CollectionChanges<DictionaryChange<TKey, TValue>>? WatchedChanges
+    {
+        get
+        {
+            var changes = _changes;
+
+            return changes is not null && changes.IsWatched ? changes : null;
+        }
+    }
 
     /// <summary>Gets the value of <paramref name="key"/>, or adds or replaces it; readers of other keys are not invalidated.</summary>
     public TValue this[TKey key]
@@ -155,6 +177,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
 
             _snapshot = null;
             keyNode = _keyNodes.GetValueOrDefault(key);
+            WatchedChanges?.Record(DictionaryChange<TKey, TValue>.Added(key, value));
         }
 
         NotifyChange(keyNode, countChanged: true);
@@ -169,13 +192,14 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         ReactiveNode? keyNode;
         lock (_gate)
         {
-            if (!_entries.Remove(key))
+            if (!_entries.Remove(key, out var value))
             {
                 return false;
             }
 
             _snapshot = null;
             keyNode = _keyNodes.GetValueOrDefault(key);
+            WatchedChanges?.Record(DictionaryChange<TKey, TValue>.Removed(key, value));
         }
 
         NotifyChange(keyNode, countChanged: true);
@@ -198,6 +222,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
             _entries.Remove(item.Key);
             _snapshot = null;
             keyNode = _keyNodes.GetValueOrDefault(item.Key);
+            WatchedChanges?.Record(DictionaryChange<TKey, TValue>.Removed(item.Key, value));
         }
 
         NotifyChange(keyNode, countChanged: true);
@@ -217,12 +242,15 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
                 return;
             }
 
-            foreach (var key in _entries.Keys)
+            var changes = WatchedChanges;
+            foreach (var (key, value) in _entries)
             {
                 if (_keyNodes.TryGetValue(key, out var node))
                 {
                     removedKeyNodes.Add(node);
                 }
+
+                changes?.Record(DictionaryChange<TKey, TValue>.Removed(key, value));
             }
 
             _entries.Clear();
@@ -240,6 +268,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
 
             ReactiveProperty.Notify(ref _countNode);
             ReactiveProperty.Notify(ref _entriesNode);
+            Volatile.Read(ref _changes)?.Notify();
         }
         finally
         {
@@ -270,10 +299,14 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
                 }
             }
 
+            var oldValue = slot;
             slot = value;
             added = !exists;
             _snapshot = null;
             keyNode = _keyNodes.GetValueOrDefault(key);
+            WatchedChanges?.Record(added
+                ? DictionaryChange<TKey, TValue>.Added(key, value)
+                : DictionaryChange<TKey, TValue>.Replaced(key, value, oldValue!));
         }
 
         NotifyChange(keyNode, countChanged: added);
@@ -309,6 +342,13 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         }
     }
 
+    private CollectionChanges<DictionaryChange<TKey, TValue>> CreateChanges()
+    {
+        var created = new CollectionChanges<DictionaryChange<TKey, TValue>>(_gate, ChangesNodeName);
+
+        return Interlocked.CompareExchange(ref _changes, created, null) ?? created;
+    }
+
     private void NotifyChange(ReactiveNode? keyNode, bool countChanged)
     {
         ReactiveBatch.Enter();
@@ -323,6 +363,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
             }
 
             ReactiveProperty.Notify(ref _entriesNode);
+            Volatile.Read(ref _changes)?.Notify();
         }
         finally
         {

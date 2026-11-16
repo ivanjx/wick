@@ -540,18 +540,23 @@ internal sealed class SyncReactiveEffect : ReactiveEffect
     private static SyncReactiveEffect? t_running;
 
     private readonly Action _effect;
+    private readonly IDisposable? _resource;
 
-    private SyncReactiveEffect(Action effect, EffectOptions? options)
+    private SyncReactiveEffect(Action effect, EffectOptions? options, IDisposable? resource)
         : base(options)
     {
         _effect = effect;
+        _resource = resource;
     }
 
     private protected override bool IsOwnWrite => t_running == this;
 
-    internal static ReactiveEffect Start(Action effect, EffectOptions? options)
+    /// <param name="effect">The code to run.</param>
+    /// <param name="options">Error handling, dispatcher and timing.</param>
+    /// <param name="resource">Disposed with the effect, for example the subscription whose changes it delivers.</param>
+    internal static ReactiveEffect Start(Action effect, EffectOptions? options, IDisposable? resource = null)
     {
-        var instance = new SyncReactiveEffect(effect, options);
+        var instance = new SyncReactiveEffect(effect, options, resource);
 
         var error = instance.Execute();
         if (error is not null)
@@ -573,6 +578,8 @@ internal sealed class SyncReactiveEffect : ReactiveEffect
 
         return instance;
     }
+
+    private protected override void OnDisposed() => _resource?.Dispose();
 
     private protected override void RunScheduled()
     {

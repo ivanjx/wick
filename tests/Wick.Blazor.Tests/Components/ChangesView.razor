@@ -1,0 +1,22 @@
+@* Watches the changes of State.Items and logs each delivery, with whether it ran on the renderer's dispatcher. *@
+@inherits ReactiveComponentBase
+@using System.Collections.Concurrent
+@using Wick.Core
+@inject AppState State
+@inject RenderProbe Probe
+<p>changes</p>
+
+@code {
+    private readonly ConcurrentQueue<string> _log = new();
+
+    public string[] Log => [.. _log];
+
+    protected override void OnInitialized()
+    {
+        Watch(State.Items.Changes, changes =>
+        {
+            var items = string.Join(", ", changes.Select(change => $"{change.Kind} {change.Item}"));
+            _log.Enqueue($"{items} {Probe.Dispatcher!.CheckAccess()}");
+        });
+    }
+}

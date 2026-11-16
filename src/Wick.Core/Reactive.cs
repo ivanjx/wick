@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Wick.Core;
 
@@ -297,6 +298,36 @@ public static class Reactive
         return Watch(source, (value, previous, _) => onChange(value, previous), options, comparer);
     }
 
+    /// <summary>
+    /// Calls <paramref name="onChanges"/> with what changed in a reactive collection, in order, until disposed:
+    /// <code>
+    /// Reactive.Watch(State.Items.Changes, changes =&gt; audit.Record(changes));
+    /// </code>
+    /// Each call receives every change made since the previous one: none is dropped or merged. The changes of a
+    /// <see cref="Batch"/> or <see cref="BatchAsync"/> arrive together, once it has ended.
+    /// </summary>
+    /// <remarks>
+    /// It is an effect that reads nothing but the changes: calls happen on the thread pool, or through
+    /// <see cref="EffectOptions.Dispatcher"/>, never concurrently, and changes arriving before a call starts join it.
+    /// <see cref="EffectOptions.Debounce"/> and <see cref="EffectOptions.Throttle"/> delay calls and
+    /// <see cref="EffectOptions.FlushOnDispose"/> delivers the changes still pending at disposal. Only changes made
+    /// after this call are delivered, and none after disposal. <paramref name="onChanges"/> runs untracked and may
+    /// write reactive state, including the collection: its own changes are delivered in a later call.
+    /// </remarks>
+    /// <param name="changes">The collection's <c>Changes</c>, for example <see cref="ReactiveList{T}.Changes"/>.</param>
+    /// <param name="onChanges">Receives the changes, never an empty list.</param>
+    /// <param name="options">Error handling, dispatcher and timing, as for <see cref="Effect(Action, EffectOptions?)"/>.</param>
+    public static ReactiveEffect Watch<TChange>(
+        CollectionChanges<TChange> changes,
+        Action<IReadOnlyList<TChange>> onChanges,
+        EffectOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+        ArgumentNullException.ThrowIfNull(onChanges);
+
+        return changes.Watch(onChanges, options);
+    }
+
     internal static void ReportUnhandledEffectException(Exception exception)
     {
         var handler = UnhandledEffectException;
@@ -326,6 +357,9 @@ internal static class ReactiveBatch
     [ThreadStatic]
     private static HashSet<ReactiveNode>? t_pending;
 
+    [ThreadStatic]
+    private static BatchCommit? t_commit;
+
     private static readonly AsyncLocal<AsyncBatch?> s_asyncBatch = new();
 
     // Lets every notification skip the AsyncLocal lookup while no asynchronous batch exists anywhere.
@@ -354,12 +388,47 @@ internal static class ReactiveBatch
         return true;
     }
 
+    /// <summary>
+    /// The batch that would defer a notification raised here now, as a <see cref="BatchCommit"/> committed when it
+    /// ends, before its notifications are released; null outside any batch. Mirrors <see cref="TryDefer"/>.
+    /// </summary>
+    internal static BatchCommit? CurrentCommit()
+    {
+        if (Volatile.Read(ref s_activeAsyncBatches) > 0)
+        {
+            var asyncBatch = s_asyncBatch.Value;
+            if (asyncBatch is not null && asyncBatch.TryGetCommit(out var commit))
+            {
+                return commit;
+            }
+        }
+
+        if (t_depth == 0)
+        {
+            return null;
+        }
+
+        return t_commit ??= new BatchCommit();
+    }
+
     internal static void Enter() => t_depth++;
 
     internal static void Exit()
     {
+        if (--t_depth > 0)
+        {
+            return;
+        }
+
+        var commit = t_commit;
+        if (commit is not null)
+        {
+            t_commit = null;
+            commit.Commit();
+        }
+
         var pending = t_pending;
-        if (--t_depth > 0 || pending is null || pending.Count == 0)
+        if (pending is null || pending.Count == 0)
         {
             return;
         }
@@ -420,6 +489,7 @@ internal static class ReactiveBatch
     {
         private readonly Lock _gate = new();
         private readonly HashSet<ReactiveNode> _pending = [];
+        private BatchCommit? _commit;
         private bool _completed;
 
         public bool IsCompleted
@@ -448,11 +518,28 @@ internal static class ReactiveBatch
             }
         }
 
+        public bool TryGetCommit([NotNullWhen(true)] out BatchCommit? commit)
+        {
+            lock (_gate)
+            {
+                if (_completed)
+                {
+                    commit = null;
+                    return false;
+                }
+
+                commit = _commit ??= new BatchCommit();
+
+                return true;
+            }
+        }
+
         public ReactiveNode[] Complete()
         {
             lock (_gate)
             {
                 _completed = true;
+                _commit?.Commit();
                 ReactiveNode[] nodes = [.. _pending];
                 _pending.Clear();
 
@@ -460,4 +547,17 @@ internal static class ReactiveBatch
             }
         }
     }
+}
+
+/// <summary>
+/// Marks the changes recorded during one batch (see <see cref="CollectionChanges{TChange}"/>) as deliverable: they
+/// must not reach a listener before the batch ends, together with the batch's notifications.
+/// </summary>
+internal sealed class BatchCommit
+{
+    private volatile bool _committed;
+
+    public bool IsCommitted => _committed;
+
+    public void Commit() => _committed = true;
 }

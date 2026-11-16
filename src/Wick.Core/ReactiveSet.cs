@@ -26,12 +26,14 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
 {
     private const string ItemsNodeName = "ReactiveSet<T>";
     private const string ItemNodeName = "ReactiveSet[item]";
+    private const string ChangesNodeName = "ReactiveSet<T>.Changes";
 
     private readonly Lock _gate = new();
     private readonly HashSet<T> _items;
     private readonly Dictionary<T, ReactiveNode> _itemNodes;
     private T[]? _snapshot;
     private ReactiveNode? _itemsNode;
+    private CollectionChanges<SetChange<T>>? _changes;
 
     public ReactiveSet()
         : this(comparer: null)
@@ -67,6 +69,27 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
     }
 
     bool ICollection<T>.IsReadOnly => false;
+
+    /// <summary>
+    /// The changes made to the set from now on, in order, for
+    /// <see cref="Reactive.Watch{TChange}(CollectionChanges{TChange}, Action{IReadOnlyList{TChange}}, EffectOptions?)"/>:
+    /// <c>Reactive.Watch(set.Changes, changes =&gt; ...)</c>. Every mutation, including <see cref="Clear"/> and the
+    /// bulk ones, reports one change per item it added or removed.
+    /// </summary>
+    /// <remarks>Reading it is not tracked. Changes are recorded only while watched.</remarks>
+    public CollectionChanges<SetChange<T>> Changes
+        => Volatile.Read(ref _changes) ?? CreateChanges();
+
+    /// <summary>The change stream while watched, else null; read under the lock, before recording.</summary>
+    private CollectionChanges<SetChange<T>>? WatchedChanges
+    {
+        get
+        {
+            var changes = _changes;
+
+            return changes is not null && changes.IsWatched ? changes : null;
+        }
+    }
 
     /// <summary>The items as an immutable array; tracked like enumeration.</summary>
     public ImmutableArray<T> Snapshot()
@@ -125,6 +148,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
 
             _snapshot = null;
             itemNode = _itemNodes.GetValueOrDefault(item);
+            WatchedChanges?.Record(SetChange<T>.Added(item));
         }
 
         NotifyChange(itemNode);
@@ -148,6 +172,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
 
             _snapshot = null;
             itemNode = _itemNodes.GetValueOrDefault(item);
+            WatchedChanges?.Record(SetChange<T>.Removed(item));
         }
 
         NotifyChange(itemNode);
@@ -167,9 +192,11 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
                 return;
             }
 
+            var changes = WatchedChanges;
             foreach (var item in _items)
             {
                 CollectNode(item, changedNodes);
+                changes?.Record(SetChange<T>.Removed(item));
             }
 
             _items.Clear();
@@ -190,12 +217,14 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         var changed = false;
         lock (_gate)
         {
+            var changes = WatchedChanges;
             foreach (var item in others)
             {
                 if (_items.Add(item))
                 {
                     changed = true;
                     CollectNode(item, changedNodes);
+                    changes?.Record(SetChange<T>.Added(item));
                 }
             }
 
@@ -221,12 +250,14 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         var changed = false;
         lock (_gate)
         {
+            var changes = WatchedChanges;
             foreach (var item in others)
             {
                 if (_items.Remove(item))
                 {
                     changed = true;
                     CollectNode(item, changedNodes);
+                    changes?.Record(SetChange<T>.Removed(item));
                 }
             }
 
@@ -258,10 +289,12 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
                 return;
             }
 
+            var changes = WatchedChanges;
             foreach (var item in removed)
             {
                 _items.Remove(item);
                 CollectNode(item, changedNodes);
+                changes?.Record(SetChange<T>.Removed(item));
             }
 
             _snapshot = null;
@@ -287,11 +320,17 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
                 return;
             }
 
+            var changes = WatchedChanges;
             foreach (var item in toggled)
             {
-                if (!_items.Remove(item))
+                if (_items.Remove(item))
+                {
+                    changes?.Record(SetChange<T>.Removed(item));
+                }
+                else
                 {
                     _items.Add(item);
+                    changes?.Record(SetChange<T>.Added(item));
                 }
 
                 CollectNode(item, changedNodes);
@@ -354,6 +393,13 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         }
     }
 
+    private CollectionChanges<SetChange<T>> CreateChanges()
+    {
+        var created = new CollectionChanges<SetChange<T>>(_gate, ChangesNodeName);
+
+        return Interlocked.CompareExchange(ref _changes, created, null) ?? created;
+    }
+
     private void NotifyChange(ReactiveNode? itemNode)
     {
         ReactiveBatch.Enter();
@@ -362,6 +408,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         {
             itemNode?.Notify();
             ReactiveProperty.Notify(ref _itemsNode);
+            Volatile.Read(ref _changes)?.Notify();
         }
         finally
         {
@@ -381,6 +428,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
             }
 
             ReactiveProperty.Notify(ref _itemsNode);
+            Volatile.Read(ref _changes)?.Notify();
         }
         finally
         {

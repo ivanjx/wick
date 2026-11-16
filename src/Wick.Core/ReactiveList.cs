@@ -22,12 +22,14 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 {
     private const string CountNodeName = "ReactiveList<T>.Count";
     private const string ItemsNodeName = "ReactiveList<T>";
+    private const string ChangesNodeName = "ReactiveList<T>.Changes";
 
     private readonly Lock _gate = new();
     private readonly List<T> _items;
     private T[]? _snapshot;
     private ReactiveNode? _countNode;
     private ReactiveNode? _itemsNode;
+    private CollectionChanges<ListChange<T>>? _changes;
 
     public ReactiveList()
     {
@@ -56,6 +58,27 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
     bool ICollection<T>.IsReadOnly => false;
 
+    /// <summary>
+    /// The changes made to the list from now on, in order, for
+    /// <see cref="Reactive.Watch{TChange}(CollectionChanges{TChange}, Action{IReadOnlyList{TChange}}, EffectOptions?)"/>:
+    /// <c>Reactive.Watch(list.Changes, changes =&gt; ...)</c>. <see cref="Clear"/> and <see cref="ReplaceAll"/>
+    /// report a <see cref="CollectionChangeKind.Reset"/>; the other mutations report one change per item.
+    /// </summary>
+    /// <remarks>Reading it is not tracked. Changes are recorded only while watched.</remarks>
+    public CollectionChanges<ListChange<T>> Changes
+        => Volatile.Read(ref _changes) ?? CreateChanges();
+
+    /// <summary>The change stream while watched, else null; read under the lock, before recording.</summary>
+    private CollectionChanges<ListChange<T>>? WatchedChanges
+    {
+        get
+        {
+            var changes = _changes;
+
+            return changes is not null && changes.IsWatched ? changes : null;
+        }
+    }
+
     public T this[int index]
     {
         get
@@ -73,16 +96,18 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
             lock (_gate)
             {
-                if (EqualityComparer<T>.Default.Equals(_items[index], value))
+                var oldItem = _items[index];
+                if (EqualityComparer<T>.Default.Equals(oldItem, value))
                 {
                     return;
                 }
 
                 _items[index] = value;
                 _snapshot = null;
+                WatchedChanges?.Record(ListChange<T>.Replaced(value, oldItem, index));
             }
 
-            ReactiveProperty.Notify(ref _itemsNode);
+            NotifyItems();
         }
     }
 
@@ -139,6 +164,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         {
             _items.Add(item);
             _snapshot = null;
+            WatchedChanges?.Record(ListChange<T>.Added(item, _items.Count - 1));
         }
 
         NotifyCountAndItems();
@@ -158,8 +184,10 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
         lock (_gate)
         {
+            var start = _items.Count;
             _items.AddRange(added);
             _snapshot = null;
+            RecordAdded(added, start);
         }
 
         NotifyCountAndItems();
@@ -173,6 +201,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         {
             _items.Insert(index, item);
             _snapshot = null;
+            WatchedChanges?.Record(ListChange<T>.Added(item, index));
         }
 
         NotifyCountAndItems();
@@ -184,12 +213,17 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
         lock (_gate)
         {
-            if (!_items.Remove(item))
+            // What List<T>.Remove does, keeping the index for the change.
+            var index = _items.IndexOf(item);
+            if (index < 0)
             {
                 return false;
             }
 
+            var removed = _items[index];
+            _items.RemoveAt(index);
             _snapshot = null;
+            WatchedChanges?.Record(ListChange<T>.Removed(removed, index));
         }
 
         NotifyCountAndItems();
@@ -203,8 +237,12 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
         lock (_gate)
         {
+            var changes = WatchedChanges;
+            var removed = changes is null ? default! : _items[index];
+
             _items.RemoveAt(index);
             _snapshot = null;
+            changes?.Record(ListChange<T>.Removed(removed, index));
         }
 
         NotifyCountAndItems();
@@ -219,7 +257,8 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         int removed;
         lock (_gate)
         {
-            removed = _items.RemoveAll(match);
+            var changes = WatchedChanges;
+            removed = changes is null ? _items.RemoveAll(match) : RemoveAll(match, changes);
             if (removed == 0)
             {
                 return 0;
@@ -246,6 +285,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
             _items.Clear();
             _snapshot = null;
+            WatchedChanges?.Record(ListChange<T>.Reset([]));
         }
 
         NotifyCountAndItems();
@@ -270,9 +310,10 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
             _items.RemoveAt(oldIndex);
             _items.Insert(newIndex, item);
             _snapshot = null;
+            WatchedChanges?.Record(ListChange<T>.Moved(item, newIndex, oldIndex));
         }
 
-        ReactiveProperty.Notify(ref _itemsNode);
+        NotifyItems();
     }
 
     /// <summary>Replaces all items in one change; <see cref="Count"/> readers are invalidated only when the count differs.</summary>
@@ -291,6 +332,9 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
             _items.Clear();
             _items.AddRange(replacement);
             _snapshot = null;
+
+            // The array is never written again, so the change can share it.
+            WatchedChanges?.Record(ListChange<T>.Reset(ImmutableCollectionsMarshal.AsImmutableArray(replacement)));
         }
 
         if (countChanged)
@@ -299,7 +343,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
             return;
         }
 
-        ReactiveProperty.Notify(ref _itemsNode);
+        NotifyItems();
     }
 
     private T[] CreateSnapshot()
@@ -307,6 +351,90 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         lock (_gate)
         {
             return _snapshot ??= _items.ToArray();
+        }
+    }
+
+    private CollectionChanges<ListChange<T>> CreateChanges()
+    {
+        var created = new CollectionChanges<ListChange<T>>(_gate, ChangesNodeName);
+
+        return Interlocked.CompareExchange(ref _changes, created, null) ?? created;
+    }
+
+    /// <summary>Records the items just added from <paramref name="start"/> on; called under the lock.</summary>
+    private void RecordAdded(T[] added, int start)
+    {
+        var changes = WatchedChanges;
+        if (changes is null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < added.Length; i++)
+        {
+            changes.Record(ListChange<T>.Added(added[i], start + i));
+        }
+    }
+
+    /// <summary>
+    /// <see cref="List{T}.RemoveAll"/> that records each removal, at its index once the earlier ones are removed;
+    /// called under the lock. The list is left unchanged when <paramref name="match"/> throws.
+    /// </summary>
+    private int RemoveAll(Predicate<T> match, CollectionChanges<ListChange<T>> changes)
+    {
+        var matches = new bool[_items.Count];
+        var removed = 0;
+        for (var i = 0; i < matches.Length; i++)
+        {
+            if (match(_items[i]))
+            {
+                matches[i] = true;
+                removed++;
+            }
+        }
+
+        if (removed == 0)
+        {
+            return 0;
+        }
+
+        var kept = 0;
+        for (var i = 0; i < matches.Length; i++)
+        {
+            var item = _items[i];
+            if (matches[i])
+            {
+                changes.Record(ListChange<T>.Removed(item, kept));
+                continue;
+            }
+
+            _items[kept++] = item;
+        }
+
+        _items.RemoveRange(kept, _items.Count - kept);
+
+        return removed;
+    }
+
+    private void NotifyItems()
+    {
+        var changes = Volatile.Read(ref _changes);
+        if (changes is null)
+        {
+            ReactiveProperty.Notify(ref _itemsNode);
+            return;
+        }
+
+        ReactiveBatch.Enter();
+
+        try
+        {
+            ReactiveProperty.Notify(ref _itemsNode);
+            changes.Notify();
+        }
+        finally
+        {
+            ReactiveBatch.Exit();
         }
     }
 
@@ -318,6 +446,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         {
             ReactiveProperty.Notify(ref _countNode);
             ReactiveProperty.Notify(ref _itemsNode);
+            Volatile.Read(ref _changes)?.Notify();
         }
         finally
         {

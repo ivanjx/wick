@@ -139,6 +139,27 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         => Own(Reactive.Watch(source, onChange, OnDispatcher(options), comparer));
 
     /// <summary>
+    /// Component-owned form of
+    /// <see cref="Reactive.Watch{TChange}(CollectionChanges{TChange}, Action{IReadOnlyList{TChange}}, EffectOptions?)"/>:
+    /// calls <paramref name="onChanges"/> with what changed in a reactive collection, in order, on the component's
+    /// dispatcher, until the component is disposed:
+    /// <code>
+    /// Watch(State.Markers.Changes, changes =&gt; Canvas.Apply(changes));
+    /// </code>
+    /// </summary>
+    /// <param name="changes">The collection's <c>Changes</c>, for example <see cref="ReactiveList{T}.Changes"/>.</param>
+    /// <param name="onChanges">Receives every change made since the previous call, never an empty list; it runs untracked.</param>
+    /// <param name="options">
+    /// Error handling and timing, see <see cref="EffectOptions"/>. Without <see cref="EffectOptions.Dispatcher"/>, the
+    /// component's <see cref="ComponentBase.InvokeAsync(Func{Task})"/> is used.
+    /// </param>
+    protected ReactiveEffect Watch<TChange>(
+        CollectionChanges<TChange> changes,
+        Action<IReadOnlyList<TChange>> onChanges,
+        EffectOptions? options = null)
+        => Own(Reactive.Watch(changes, onChanges, OnDispatcher(options)));
+
+    /// <summary>
     /// Component-owned form of <see cref="Reactive.Debounced{T}"/>: a value that follows <paramref name="read"/> once
     /// it has stopped changing for <paramref name="delay"/>, disposed together with the component.
     /// </summary>

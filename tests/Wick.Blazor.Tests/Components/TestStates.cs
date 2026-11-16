@@ -22,6 +22,8 @@ public sealed partial class AppState
     public partial string Details { get; set; } = "";
 
     public partial UserState User { get; set; } = new();
+
+    public ReactiveList<string> Items { get; } = [];
 }
 
 [ReactiveState]

@@ -1,4 +1,5 @@
 using Wick.Blazor.Tests.Components;
+using Wick.Core;
 
 namespace Wick.Blazor.Tests;
 
@@ -163,6 +164,42 @@ public sealed class ComponentEffectTests : ReactiveTestContext
 
         Assert.True(view.LastToken.IsCancellationRequested);
         Assert.DoesNotContain("after 2 True", view.Log);
+    }
+
+    [Fact]
+    public void A_component_watch_receives_the_changes_of_a_batch_together_on_the_dispatcher()
+    {
+        var view = Render<ChangesView>().Instance;
+
+        Reactive.Batch(() =>
+        {
+            State.Items.Add("a");
+            State.Items.Add("b");
+        });
+
+        Assert.True(SpinWait.SpinUntil(() => view.Log.Length == 1, Timeout));
+
+        State.Items.Remove("a");
+
+        Assert.True(SpinWait.SpinUntil(() => view.Log.Length == 2, Timeout));
+        Assert.Equal(["Added a, Added b True", "Removed a True"], view.Log);
+    }
+
+    [Fact]
+    public void Removing_the_component_stops_its_change_watch()
+    {
+        var host = Render<ToggleHost>(parameters => parameters.AddChildContent<ChangesView>());
+        var view = host.FindComponent<ChangesView>().Instance;
+
+        Assert.True(State.Items.Changes.IsWatched);
+
+        host.Render(parameters => parameters.Add(p => p.Show, false));
+
+        Assert.False(State.Items.Changes.IsWatched);
+
+        State.Items.Add("a");
+
+        AssertNoMoreRuns(() => view.Log.Length, expected: 0);
     }
 
     /// <summary>Effects re-run asynchronously, so give a run that should not happen time to show up.</summary>

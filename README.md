@@ -195,6 +195,62 @@ All three are thread-safe, and enumerating them while another thread writes is s
 
 Arrays are fine as long as you replace them (`Cells = [.. cells]`). Writing one element in place (`State.Cells[i] = x`) is not tracked, and the compiler warns about it.
 
+#### Reacting to what changed: `Changes`
+
+A reader of a collection learns *that* it changed. To act on *what* changed, for example to call JavaScript once per added item, watch its `Changes`. In a component, `Watch` calls the handler on the component's dispatcher and stops with the component:
+
+```csharp
+public partial class ToastHost : ReactiveComponentBase
+{
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private ToastState Toasts { get; set; } = default!;
+
+    private readonly List<string> _toShow = [];
+
+    protected override void OnInitialized()
+    {
+        Watch(Toasts.Items.Changes, changes =>
+        {
+            foreach (var change in changes)
+            {
+                if (change.Kind == CollectionChangeKind.Added)
+                {
+                    _toShow.Add(change.Item.Id);
+                }
+            }
+
+            // _toShow isn't reactive: render, so that the new toasts exist when OnAfterRenderAsync shows them.
+            StateHasChanged();
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        string[] ids = [.. _toShow];
+        _toShow.Clear();
+
+        foreach (var id in ids)
+        {
+            await JS.InvokeVoidAsync("toast.show", id);
+        }
+    }
+}
+```
+
+Outside components, use `Reactive.Watch(State.Items.Changes, changes => ...)` and dispose it with its owner.
+
+- **What you get:**
+  - `ReactiveList<T>` delivers `ListChange<T>`: `Added`, `Removed`, `Replaced` and `Moved`, with the item and its indices. `Clear` and `ReplaceAll` are a `Reset` carrying the new `Items`. Applying the changes in order to a copy reproduces the list.
+  - `ReactiveSet<T>` delivers `SetChange<T>`: `Added` and `Removed`.
+  - `ReactiveDictionary<TKey, TValue>` delivers `DictionaryChange<TKey, TValue>`: `Added`, `Replaced` (with `OldValue`) and `Removed`.
+  - A set or dictionary reports `Clear` and the bulk operations as one change per item.
+- **Nothing is dropped or merged:** each call receives every change made since the previous call, in order, and never an empty list. Two adds are two `Added` changes, even when one call delivers both.
+- **Batches:** the changes made in a `Reactive.Batch` or `BatchAsync` arrive together, in one call, once it has ended.
+- **Everything else** works as for [`Watch`](#reacting-to-changes-watch): it starts with the next change, the handler runs untracked and may write state, and `EffectOptions` set the dispatcher, error handling, debounce or throttle.
+- **Cost:** changes are recorded only while watched. A collection nobody watches records nothing.
+
+`samples/Wick.Sample` logs the todo items added and removed with a collection watch.
+
 ### Local component state
 
 State that belongs to one component doesn't need a service. In a `@code` block, use `ReactiveValue<T>`; the source generator can't see partial properties declared in a `.razor` file:

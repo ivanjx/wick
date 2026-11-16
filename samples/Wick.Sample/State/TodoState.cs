@@ -23,7 +23,7 @@ public enum TodoFilter
 /// <summary>
 /// Items live in a <see cref="ReactiveList{T}"/>: adding or removing re-renders the readers of the list, while
 /// toggling or renaming an item re-renders only the components that read that item. <see cref="Visible"/> and
-/// <see cref="Remaining"/> are cached derived values, and an effect writes the activity log.
+/// <see cref="Remaining"/> are cached derived values, and an effect and two watches write the activity log.
 /// </summary>
 [ReactiveState]
 public sealed partial class TodoState : IDisposable
@@ -37,6 +37,7 @@ public sealed partial class TodoState : IDisposable
     private readonly Derived<int> _remaining;
     private readonly ReactiveEffect _logRemaining;
     private readonly ReactiveEffect _logFilter;
+    private readonly ReactiveEffect _logItems;
 
     public TodoState()
     {
@@ -57,6 +58,18 @@ public sealed partial class TodoState : IDisposable
 
         // A watch reacts to changes only, and receives the value it replaces.
         _logFilter = Reactive.Watch(() => Filter, (filter, previous) => Log($"Filter {previous} → {filter}"));
+
+        // A collection watch receives what changed: each added or removed item, in order.
+        _logItems = Reactive.Watch(Items.Changes, changes =>
+        {
+            foreach (var change in changes)
+            {
+                if (change.Kind == CollectionChangeKind.Added || change.Kind == CollectionChangeKind.Removed)
+                {
+                    Log($"{change.Kind} “{change.Item.Title}”");
+                }
+            }
+        });
     }
 
     public ReactiveList<TodoItem> Items { get; } =
@@ -107,6 +120,7 @@ public sealed partial class TodoState : IDisposable
     {
         _logRemaining.Dispose();
         _logFilter.Dispose();
+        _logItems.Dispose();
         _visible.Dispose();
         _remaining.Dispose();
     }
