@@ -47,6 +47,26 @@ internal static class ReactiveStateExtensions
     public static ReactiveNode? Node(this IReactiveState state, string property) => state.FindNode(property);
 }
 
+[ReactiveState]
+internal sealed partial class EqualityState
+{
+    [ReactiveEquality(ReactiveEqualityMode.Reference)]
+    public partial string Content { get; set; } = "";
+
+    [ReactiveEquality(ReactiveEqualityMode.Never)]
+    public partial int Pulse { get; set; }
+
+    [ReactiveEquality(typeof(IgnoreCaseComparer))]
+    public partial string Search { get; set; } = "";
+}
+
+internal sealed class IgnoreCaseComparer : IEqualityComparer<string>
+{
+    public bool Equals(string? x, string? y) => string.Equals(x, y, StringComparison.OrdinalIgnoreCase);
+
+    public int GetHashCode(string obj) => StringComparer.OrdinalIgnoreCase.GetHashCode(obj);
+}
+
 internal sealed class CountingObserver : ReactiveObserver
 {
     private int _invalidations;

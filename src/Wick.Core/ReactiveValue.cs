@@ -11,29 +11,46 @@ namespace Wick.Core;
 /// child component, it re-renders only the child that reads it.
 /// </summary>
 /// <remarks>
-/// Writes of a value equal by <see cref="EqualityComparer{T}.Default"/> are ignored. Like generated properties, it
-/// guards no more than the field: reading a large struct while another thread writes it can observe a torn value.
+/// Writes of a value equal by the comparer, <see cref="EqualityComparer{T}.Default"/> unless one is passed, are
+/// ignored. Like generated properties, it guards no more than the field: reading a large struct while another thread
+/// writes it can observe a torn value.
 /// </remarks>
 public sealed class ReactiveValue<T>
 {
     private const string DefaultName = "ReactiveValue<T>";
 
     private readonly string _name;
+    private readonly IEqualityComparer<T>? _comparer;
     private ReactiveNode? _node;
     private T _value;
 
     /// <param name="value">The initial value.</param>
     /// <param name="name">The name <see cref="WickDiagnostics"/> reports for changes to this value.</param>
-    public ReactiveValue(T value, string? name = null)
+    /// <param name="comparer">
+    /// Decides whether a write changes the value, for example <see cref="ReferenceEqualityComparer.Instance"/> for a
+    /// large object; <see cref="EqualityComparer{T}.Default"/> by default.
+    /// </param>
+    public ReactiveValue(T value, string? name = null, IEqualityComparer<T>? comparer = null)
     {
         _value = value;
         _name = name ?? DefaultName;
+        _comparer = comparer;
     }
 
     /// <summary>The current value. Reads are tracked; setting a different value notifies its readers.</summary>
     public T Value
     {
         get => ReactiveProperty.Get(ref _value, ref _node, _name);
-        set => ReactiveProperty.Set(ref _value, value, ref _node);
+        set
+        {
+            if (_comparer is null)
+            {
+                ReactiveProperty.Set(ref _value, value, ref _node);
+            }
+            else
+            {
+                ReactiveProperty.Set(ref _value, value, ref _node, _comparer);
+            }
+        }
     }
 }

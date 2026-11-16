@@ -28,12 +28,17 @@ public abstract class ReactiveObject : IReactiveState
     }
 
     protected bool Set<T>(ref T field, T value, [CallerMemberName] string property = "")
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-        {
-            return false;
-        }
+        => !EqualityComparer<T>.Default.Equals(field, value) && Write(ref field, value, property);
 
+    /// <summary>
+    /// Like <see cref="Set{T}(ref T, T, string)"/>, but a write notifies only when it differs by
+    /// <paramref name="comparer"/>, for example <see cref="ReferenceEqualityComparer.Instance"/> for a large object.
+    /// </summary>
+    protected bool Set<T>(ref T field, T value, IEqualityComparer<T> comparer, [CallerMemberName] string property = "")
+        => !comparer.Equals(field, value) && Write(ref field, value, property);
+
+    private bool Write<T>(ref T field, T value, string property)
+    {
         ReactiveObserver.ThrowIfTracking();
 
         field = value;

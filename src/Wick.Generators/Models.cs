@@ -26,6 +26,8 @@ internal sealed record TypeHeader(string Keyword, string Name);
 /// <param name="SetKeyword"><c>set</c> or <c>init</c>.</param>
 /// <param name="NullableAnnotations">Nullable annotation context at the declaration.</param>
 /// <param name="NullableWarnings">Nullable warning context at the declaration.</param>
+/// <param name="Equality">How the setter compares a written value with the current one.</param>
+/// <param name="ComparerType">The fully qualified comparer type when <paramref name="Equality"/> is <see cref="EqualityKind.Comparer"/>.</param>
 internal sealed record PropertyModel(
     string Name,
     string Identifier,
@@ -35,7 +37,18 @@ internal sealed record PropertyModel(
     string SetKeyword,
     string SetModifiers,
     bool NullableAnnotations,
-    bool NullableWarnings);
+    bool NullableWarnings,
+    EqualityKind Equality,
+    string? ComparerType);
+
+/// <summary>The setter's comparison; the first three match <c>Wick.Core.ReactiveEqualityMode</c>.</summary>
+internal enum EqualityKind
+{
+    Default,
+    Reference,
+    Never,
+    Comparer,
+}
 
 /// <summary>A diagnostic without syntax tree references, so it does not defeat incremental caching.</summary>
 internal sealed record DiagnosticInfo(

@@ -69,4 +69,20 @@ internal static class Diagnostics
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor InvalidEquality = new(
+        id: "WK0009",
+        title: "Invalid [ReactiveEquality]",
+        messageFormat: "[ReactiveEquality] on property '{0}' is invalid: {1}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor EqualityHasNoEffect = new(
+        id: "WK0010",
+        title: "[ReactiveEquality] has no effect",
+        messageFormat: "[ReactiveEquality] on property '{0}' has no effect: only the setters of generated partial properties in [ReactiveState] types use it",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
 }

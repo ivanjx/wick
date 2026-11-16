@@ -23,9 +23,11 @@ namespace Wick.Generators;
 public sealed class ReactiveStateGenerator : IIncrementalGenerator
 {
     private const string AttributeMetadataName = "Wick.Core.ReactiveStateAttribute";
+    private const string EqualityAttributeMetadataName = "Wick.Core.ReactiveEqualityAttribute";
     private const string ReactiveObjectMetadataName = "Wick.Core.ReactiveObject";
     private const string Core = "global::Wick.Core";
     private const string NodeFieldPrefix = "__reactiveNode_";
+    private const string ComparerFieldPrefix = "__reactiveComparer_";
     private const string FindNodeMethod = "__FindReactiveNode";
 
     private static readonly SymbolDisplayFormat TypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
@@ -108,9 +110,17 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
                 continue;
             }
 
+            var equalityProblem = ReadEquality(property, type, context.SemanticModel.Compilation, out var equality, out var comparerType, out var attribute);
+            if (equalityProblem is not null)
+            {
+                var location = attribute?.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation() ?? syntax.Identifier.GetLocation();
+                diagnostics.Add(DiagnosticInfo.Create(Diagnostics.InvalidEquality, location, property.Name, equalityProblem));
+                continue;
+            }
+
             var nullableContext = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree).GetNullableContext(syntax.SpanStart);
 
-            properties.Add(CreatePropertyModel(property, syntax, nullableContext));
+            properties.Add(CreatePropertyModel(property, syntax, nullableContext, equality, comparerType));
         }
 
         if (diagnostics.Any(diagnostic => diagnostic.Descriptor.DefaultSeverity == DiagnosticSeverity.Error))
@@ -181,6 +191,97 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
         return null;
     }
 
+    /// <summary>Reads <c>[ReactiveEquality]</c>; returns why it is invalid, or null.</summary>
+    private static string? ReadEquality(
+        IPropertySymbol property,
+        INamedTypeSymbol state,
+        Compilation compilation,
+        out EqualityKind equality,
+        out string? comparerType,
+        out AttributeData? attribute)
+    {
+        equality = EqualityKind.Default;
+        comparerType = null;
+        attribute = property.GetAttributes().FirstOrDefault(candidate => candidate.AttributeClass?.ToDisplayString() == EqualityAttributeMetadataName);
+
+        // A missing or malformed argument is reported by the compiler.
+        if (attribute is null || attribute.ConstructorArguments.Length != 1)
+        {
+            return null;
+        }
+
+        var argument = attribute.ConstructorArguments[0];
+        if (argument.Kind == TypedConstantKind.Type)
+        {
+            if (argument.Value is not INamedTypeSymbol comparer)
+            {
+                return "a comparer type is required";
+            }
+
+            var problem = FindComparerProblem(comparer, property.Type, state, compilation);
+            if (problem is not null)
+            {
+                return problem;
+            }
+
+            equality = EqualityKind.Comparer;
+            comparerType = comparer.ToDisplayString(TypeFormat);
+            return null;
+        }
+
+        switch (argument.Value)
+        {
+            case (int)EqualityKind.Default:
+                return null;
+
+            case (int)EqualityKind.Reference:
+                if (!property.Type.IsReferenceType)
+                {
+                    return $"reference equality needs a reference type, but '{property.Type.ToDisplayString(SymbolDisplayFormat.CSharpShortErrorMessageFormat)}' is not one";
+                }
+
+                equality = EqualityKind.Reference;
+                return null;
+
+            case (int)EqualityKind.Never:
+                equality = EqualityKind.Never;
+                return null;
+
+            default:
+                return $"'{argument.Value}' is not a ReactiveEqualityMode";
+        }
+    }
+
+    private static string? FindComparerProblem(INamedTypeSymbol comparer, ITypeSymbol propertyType, INamedTypeSymbol state, Compilation compilation)
+    {
+        var name = comparer.ToDisplayString(SymbolDisplayFormat.CSharpShortErrorMessageFormat);
+
+        if (comparer.IsUnboundGenericType)
+        {
+            return $"the open generic type '{name}' cannot be created";
+        }
+
+        if (comparer.IsAbstract || comparer.IsStatic)
+        {
+            return $"'{name}' cannot be created because it is abstract or static";
+        }
+
+        // Structs always have a parameterless constructor.
+        if (comparer.TypeKind == TypeKind.Class
+            && !comparer.InstanceConstructors.Any(constructor => constructor.Parameters.IsEmpty && compilation.IsSymbolAccessibleWithin(constructor, state)))
+        {
+            return $"'{name}' has no accessible parameterless constructor; for reference equality use ReactiveEqualityMode.Reference";
+        }
+
+        var target = compilation.GetTypeByMetadataName("System.Collections.Generic.IEqualityComparer`1")?.Construct(propertyType);
+        if (target is null || !compilation.ClassifyCommonConversion(comparer, target).IsImplicit)
+        {
+            return $"'{name}' does not implement IEqualityComparer<{propertyType.ToDisplayString(SymbolDisplayFormat.CSharpShortErrorMessageFormat)}>";
+        }
+
+        return null;
+    }
+
     private static bool HasReactiveBase(INamedTypeSymbol type)
     {
         for (var current = type.BaseType; current is not null; current = current.BaseType)
@@ -194,7 +295,12 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
         return false;
     }
 
-    private static PropertyModel CreatePropertyModel(IPropertySymbol property, PropertyDeclarationSyntax syntax, NullableContext nullableContext)
+    private static PropertyModel CreatePropertyModel(
+        IPropertySymbol property,
+        PropertyDeclarationSyntax syntax,
+        NullableContext nullableContext,
+        EqualityKind equality,
+        string? comparerType)
     {
         var accessors = syntax.AccessorList!.Accessors;
         var getter = accessors.First(accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
@@ -209,7 +315,9 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             SetKeyword: setter.Keyword.Text,
             SetModifiers: Join(setter.Modifiers),
             NullableAnnotations: nullableContext.AnnotationsEnabled(),
-            NullableWarnings: nullableContext.WarningsEnabled());
+            NullableWarnings: nullableContext.WarningsEnabled(),
+            Equality: equality,
+            ComparerType: comparerType);
 
         static string Join(SyntaxTokenList tokens) => string.Join(" ", tokens.Select(token => token.Text));
     }
@@ -289,12 +397,29 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
                 writer.Directive($"#nullable {(property.NullableWarnings ? "enable" : "disable")} warnings");
             }
 
+            var isInit = property.SetKeyword == "init";
+
+            // Shared by every instance; declared in the property's nullable context so that its type matches.
+            if (!isInit && property.Equality == EqualityKind.Comparer)
+            {
+                writer.Line($"private static readonly global::System.Collections.Generic.IEqualityComparer<{property.Type}> {ComparerFieldPrefix}{property.Name} = new {property.ComparerType}();");
+                writer.Line();
+            }
+
+            var setter = property.Equality switch
+            {
+                EqualityKind.Reference => $"{Core}.ReactiveProperty.SetByReference(ref field, value, ref {node})",
+                EqualityKind.Never => $"{Core}.ReactiveProperty.SetAlways(ref field, value, ref {node})",
+                EqualityKind.Comparer => $"{Core}.ReactiveProperty.Set(ref field, value, ref {node}, {ComparerFieldPrefix}{property.Name})",
+                _ => $"{Core}.ReactiveProperty.Set(ref field, value, ref {node})",
+            };
+
             writer.Line($"{property.Modifiers} {property.Type} {property.Identifier}");
             writer.Open();
             writer.Line($"{Prefix(property.GetModifiers)}get => {Core}.ReactiveProperty.Get(ref field, ref {node}, {nodeName});");
-            writer.Line(property.SetKeyword == "init"
+            writer.Line(isInit
                 ? $"{Prefix(property.SetModifiers)}init => field = value;"
-                : $"{Prefix(property.SetModifiers)}set => {Core}.ReactiveProperty.Set(ref field, value, ref {node});");
+                : $"{Prefix(property.SetModifiers)}set => {setter};");
             writer.Close();
 
             if (!matchesFileContext)

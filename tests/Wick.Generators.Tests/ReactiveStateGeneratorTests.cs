@@ -127,6 +127,51 @@ public sealed class ReactiveStateGeneratorTests
             }
             """
         },
+        {
+            "reactive equality",
+            """
+            using System;
+            using System.Collections.Generic;
+            using Wick.Core;
+
+            [ReactiveState]
+            public partial class Document<T>
+                where T : class
+            {
+                [ReactiveEquality(ReactiveEqualityMode.Reference)]
+                public partial string Content { get; set; } = "";
+
+                [ReactiveEquality(ReactiveEqualityMode.Reference)]
+                public partial T? Item { get; set; }
+
+                [ReactiveEquality(ReactiveEqualityMode.Never)]
+                public partial int Pulse { get; set; }
+
+                [ReactiveEquality(ReactiveEqualityMode.Default)]
+                public partial int Count { get; set; }
+
+                [ReactiveEquality(typeof(IgnoreCase))]
+                public partial string? Search { get; set; }
+
+                [ReactiveEquality(typeof(Rounded))]
+                public partial double Zoom { get; set; }
+            }
+
+            internal sealed class IgnoreCase : IEqualityComparer<string?>
+            {
+                public bool Equals(string? x, string? y) => string.Equals(x, y, StringComparison.OrdinalIgnoreCase);
+
+                public int GetHashCode(string? obj) => obj is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(obj);
+            }
+
+            public struct Rounded : IEqualityComparer<double>
+            {
+                public bool Equals(double x, double y) => Math.Round(x, 2) == Math.Round(y, 2);
+
+                public int GetHashCode(double obj) => Math.Round(obj, 2).GetHashCode();
+            }
+            """
+        },
     };
 
     public static TheoryData<string, string> InvalidDeclarations => new()
@@ -140,6 +185,14 @@ public sealed class ReactiveStateGeneratorTests
         { "WK0004", "[ReactiveState] public partial record State { public partial int A { get; set; } }" },
         { "WK0004", "[ReactiveState] public partial class State : ReactiveObject { public partial int A { get; set; } }" },
         { "WK0004", "[ReactiveState] public static partial class State { }" },
+        { "WK0009", "[ReactiveState] public partial class State { [ReactiveEquality(ReactiveEqualityMode.Reference)] public partial int A { get; set; } }" },
+        { "WK0009", "[ReactiveState] public partial class State { [ReactiveEquality(typeof(System.StringComparer))] public partial string A { get; set; } = \"\"; }" },
+        { "WK0009", "[ReactiveState] public partial class State { [ReactiveEquality(typeof(System.Collections.Generic.ReferenceEqualityComparer))] public partial string A { get; set; } = \"\"; }" },
+        { "WK0009", "[ReactiveState] public partial class State { [ReactiveEquality(typeof(System.Collections.Generic.EqualityComparer<string>))] public partial int A { get; set; } }" },
+        { "WK0009", "[ReactiveState] public partial class State { [ReactiveEquality((ReactiveEqualityMode)7)] public partial int A { get; set; } }" },
+        { "WK0010", "public class State { [ReactiveEquality(ReactiveEqualityMode.Never)] public int A { get; set; } }" },
+        { "WK0010", "[ReactiveState] public partial class State { [ReactiveEquality(ReactiveEqualityMode.Never)] public partial int A { get; init; } }" },
+        { "WK0010", "[ReactiveState] public partial class State { [ReactiveEquality(ReactiveEqualityMode.Never)] public int A { get; set; } }" },
     };
 
     [Theory]

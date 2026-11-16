@@ -13,3 +13,5 @@ WK0005 | Wick | Error | Reactive state requires C# 14
 WK0006 | Wick | Warning | Reactive property holds a mutable collection
 WK0007 | Wick | Warning | Reactive component declares its own disposal
 WK0008 | Wick | Warning | Writing to an element of a reactive array property is not tracked
+WK0009 | Wick | Error | Invalid [ReactiveEquality]
+WK0010 | Wick | Warning | [ReactiveEquality] has no effect

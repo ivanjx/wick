@@ -29,6 +29,37 @@ public static class ReactiveProperty
             return;
         }
 
+        Write(ref field, value, ref node);
+    }
+
+    /// <summary>Writes <paramref name="value"/> and notifies when it differs by <paramref name="comparer"/>.</summary>
+    public static void Set<T>(ref T field, T value, ref ReactiveNode? node, IEqualityComparer<T> comparer)
+    {
+        if (comparer.Equals(field, value))
+        {
+            return;
+        }
+
+        Write(ref field, value, ref node);
+    }
+
+    /// <summary>Writes <paramref name="value"/> and notifies unless it is the instance already held.</summary>
+    public static void SetByReference<T>(ref T field, T value, ref ReactiveNode? node)
+        where T : class?
+    {
+        if (ReferenceEquals(field, value))
+        {
+            return;
+        }
+
+        Write(ref field, value, ref node);
+    }
+
+    /// <summary>Writes <paramref name="value"/> and notifies, whatever the current value.</summary>
+    public static void SetAlways<T>(ref T field, T value, ref ReactiveNode? node) => Write(ref field, value, ref node);
+
+    private static void Write<T>(ref T field, T value, ref ReactiveNode? node)
+    {
         ReactiveObserver.ThrowIfTracking();
 
         field = value;

@@ -14,11 +14,12 @@ namespace Wick.Generators;
 public sealed class ReactiveStateAnalyzer : DiagnosticAnalyzer
 {
     private const string AttributeMetadataName = "Wick.Core.ReactiveStateAttribute";
+    private const string EqualityAttributeMetadataName = "Wick.Core.ReactiveEqualityAttribute";
     private const string GeneratedFileSuffix = ".ReactiveState.g.cs";
     private const string BlazorNamespace = "Microsoft.AspNetCore.Components";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-        [Diagnostics.AutoPropertyIsNotReactive, Diagnostics.MutableCollectionProperty];
+        [Diagnostics.AutoPropertyIsNotReactive, Diagnostics.MutableCollectionProperty, Diagnostics.EqualityHasNoEffect];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -34,6 +35,12 @@ public sealed class ReactiveStateAnalyzer : DiagnosticAnalyzer
             }
 
             start.RegisterSymbolAction(context => Analyze(context, attribute), SymbolKind.NamedType);
+
+            var equality = start.Compilation.GetTypeByMetadataName(EqualityAttributeMetadataName);
+            if (equality is not null)
+            {
+                start.RegisterSymbolAction(context => AnalyzeEquality(context, attribute, equality), SymbolKind.Property);
+            }
         });
     }
 
@@ -74,6 +81,35 @@ public sealed class ReactiveStateAnalyzer : DiagnosticAnalyzer
             }
         }
     }
+
+    private static void AnalyzeEquality(SymbolAnalysisContext context, INamedTypeSymbol state, INamedTypeSymbol equality)
+    {
+        var property = (IPropertySymbol)context.Symbol;
+
+        // The implementation part of a partial property shares the definition's attributes.
+        if (property.PartialDefinitionPart is not null)
+        {
+            return;
+        }
+
+        var attribute = property.GetAttributes().FirstOrDefault(candidate => SymbolEqualityComparer.Default.Equals(candidate.AttributeClass, equality));
+        if (attribute is null || UsesEquality(property, state))
+        {
+            return;
+        }
+
+        var location = attribute.ApplicationSyntaxReference?.GetSyntax(context.CancellationToken).GetLocation() ?? property.Locations.FirstOrDefault();
+        context.ReportDiagnostic(Diagnostic.Create(Diagnostics.EqualityHasNoEffect, location, property.Name));
+    }
+
+    // Init accessors only assign, and a partial property of a reactive type without an implementation is one the
+    // generator reported an error for; that error is enough.
+    private static bool UsesEquality(IPropertySymbol property, INamedTypeSymbol state)
+        => property.IsPartialDefinition
+           && property.SetMethod is not null
+           && !property.SetMethod.IsInitOnly
+           && property.ContainingType.GetAttributes().Any(candidate => SymbolEqualityComparer.Default.Equals(candidate.AttributeClass, state))
+           && (property.PartialImplementationPart is null || IsGenerated(property));
 
     // Init-only auto-properties cannot change after construction, so they need no tracking.
     private static bool IsWritableAutoProperty(IPropertySymbol property, PropertyDeclarationSyntax syntax)

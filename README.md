@@ -158,6 +158,23 @@ public int Doubled => Count * 2;
 
 Reactive objects can contain reactive objects. Each property of each object is tracked on its own, so `<p>@State.User.Name</p>` re-renders when `Name` changes or when `User` is replaced, and not when `User.Email` changes.
 
+### When a write notifies
+
+A write of a value equal to the current one, by `EqualityComparer<T>.Default`, is ignored. For a large string or record that comparison costs a full scan per write, and your logic may care about identity anyway. `[ReactiveEquality]` changes it per property:
+
+```csharp
+[ReactiveEquality(ReactiveEqualityMode.Reference)] // a new instance notifies, without comparing contents
+public partial string Content { get; set; } = "";
+
+[ReactiveEquality(ReactiveEqualityMode.Never)]     // every write notifies, even of the same value
+public partial int Pulse { get; set; }
+
+[ReactiveEquality(typeof(IgnoreCaseComparer))]     // any IEqualityComparer<T> with a parameterless constructor
+public partial string Search { get; set; } = "";
+```
+
+`ReactiveValue<T>` takes a comparer (`new(content, comparer: ReferenceEqualityComparer.Instance)`), and so does `ReactiveObject`'s `Set(ref field, value, comparer)`.
+
 ### Collections
 
 Mutating a `List<T>` in place is invisible to Wick (and the compiler warns about it, see [Diagnostics](#diagnostics)). Use the reactive collections instead:
@@ -438,6 +455,8 @@ It waits for the whole process, so tests running in parallel can delay it, but n
 | WK0006 | Warning | A reactive property holds a mutable collection whose in-place changes are not tracked |
 | WK0007 | Warning | A reactive component declares its own `Dispose` or `DisposeAsync` |
 | WK0008 | Warning | An element of an array held by a reactive property is written in place; readers are not notified |
+| WK0009 | Error | `[ReactiveEquality]` is invalid: reference equality on a value type, or a comparer type that can't be created or doesn't compare the property's type |
+| WK0010 | Warning | `[ReactiveEquality]` has no effect: the property isn't a generated reactive property with a setter |
 
 WK0001, WK0002, WK0006 and WK0007 come with IDE quick fixes: add `partial`, switch to the reactive collection, or override `Dispose(bool)`/`DisposeAsyncCore()`. For WK0007, the fix only applies to C# files; in a `.razor` file, move the cleanup into the override yourself.
 

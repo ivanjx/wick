@@ -10,7 +10,8 @@ namespace Wick.Core;
 /// }
 /// </code>
 /// Reads are tracked by the observer active on the current thread; writes of a different value
-/// (by <see cref="EqualityComparer{T}.Default"/>) invalidate the observers of that property only.
+/// (by <see cref="EqualityComparer{T}.Default"/>, or as <see cref="ReactiveEqualityAttribute"/> decides) invalidate the
+/// observers of that property only.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
 public sealed class ReactiveStateAttribute : Attribute;
