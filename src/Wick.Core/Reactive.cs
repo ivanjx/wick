@@ -88,6 +88,25 @@ public static class Reactive
     }
 
     /// <summary>
+    /// Reads reactive state without making it a dependency of the render, effect or derived value running on this
+    /// thread, for example a setting an effect uses but should not re-run for:
+    /// <code>
+    /// Effect(() => Notify(State.Message, Reactive.Untracked(() => Settings.Language)));
+    /// </code>
+    /// Writes inside <paramref name="read"/> are allowed only where they are allowed outside it.
+    /// </summary>
+    /// <remarks>Only the synchronous part of <paramref name="read"/> is untracked; reads after an <c>await</c> never are.</remarks>
+    public static T Untracked<T>(Func<T> read)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+
+        using (ReactiveObserver.SuspendTracking())
+        {
+            return read();
+        }
+    }
+
+    /// <summary>
     /// Creates a cached value computed from reactive state. It is recomputed only after something it read changed,
     /// and its readers are invalidated only when the result differs by <paramref name="comparer"/>.
     /// </summary>
@@ -174,6 +193,108 @@ public static class Reactive
         ArgumentNullException.ThrowIfNull(effect);
 
         return AsyncReactiveEffect.Start(_ => effect(), options);
+    }
+
+    /// <summary>
+    /// Calls <paramref name="onChange"/> with the new and the previous value whenever the value of
+    /// <paramref name="source"/> changes, until disposed. Unlike an effect it does not act on the current value: the
+    /// first call follows the first change.
+    /// <code>
+    /// Reactive.Watch(() => Auth.CurrentUser, (user, previous) => Cart.Clear());
+    /// </code>
+    /// </summary>
+    /// <remarks>
+    /// Only reads made by <paramref name="source"/> are tracked; <paramref name="onChange"/> runs untracked and may
+    /// write reactive state. It is an effect that reads <paramref name="source"/>: re-runs happen on the thread pool, or
+    /// through <see cref="EffectOptions.Dispatcher"/>, coalesced, and <see cref="EffectOptions.Debounce"/> or
+    /// <see cref="EffectOptions.Throttle"/> delay them. Values the source had only between two runs are never seen, so
+    /// the previous value is the one passed last time, not necessarily the one just before.
+    /// </remarks>
+    /// <param name="source">Computes the watched value; reactive state it reads is tracked. It runs once immediately.</param>
+    /// <param name="onChange">Receives the new value, then the previous one.</param>
+    /// <param name="options">Error handling, dispatcher and timing, as for <see cref="Effect(Action, EffectOptions?)"/>.</param>
+    /// <param name="comparer">Decides whether the value changed; <see cref="EqualityComparer{T}.Default"/> by default.</param>
+    public static ReactiveEffect Watch<T>(
+        Func<T> source,
+        Action<T, T> onChange,
+        EffectOptions? options = null,
+        IEqualityComparer<T>? comparer = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(onChange);
+
+        var watched = new WatchedSource<T>(source, comparer);
+
+        return SyncReactiveEffect.Start(
+            () =>
+            {
+                if (!watched.TryChange(out var value, out var previous))
+                {
+                    return;
+                }
+
+                using (ReactiveObserver.SuspendTracking())
+                {
+                    onChange(value, previous);
+                }
+            },
+            options);
+    }
+
+    /// <summary>
+    /// Asynchronous form of <see cref="Watch{T}(Func{T}, Action{T, T}, EffectOptions?, IEqualityComparer{T}?)"/>, run
+    /// like an asynchronous effect: calls never overlap, and a change during a call cancels its token, then the next
+    /// call follows once it has completed. Disposing the watch cancels the call in progress, unless
+    /// <see cref="EffectOptions.FlushOnDispose"/> is set.
+    /// </summary>
+    /// <param name="source">Computes the watched value; reactive state it reads is tracked. It runs once immediately.</param>
+    /// <param name="onChange">
+    /// Receives the new value, the previous one, and a token cancelled when the call is superseded or the watch is
+    /// disposed.
+    /// </param>
+    /// <param name="options">Error handling, dispatcher and timing, as for <see cref="Effect(Func{CancellationToken, Task}, EffectOptions?)"/>.</param>
+    /// <param name="comparer">Decides whether the value changed; <see cref="EqualityComparer{T}.Default"/> by default.</param>
+    public static ReactiveEffect Watch<T>(
+        Func<T> source,
+        Func<T, T, CancellationToken, Task> onChange,
+        EffectOptions? options = null,
+        IEqualityComparer<T>? comparer = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(onChange);
+
+        var watched = new WatchedSource<T>(source, comparer);
+
+        return AsyncReactiveEffect.Start(
+            token =>
+            {
+                if (!watched.TryChange(out var value, out var previous))
+                {
+                    return Task.CompletedTask;
+                }
+
+                using (ReactiveObserver.SuspendTracking())
+                {
+                    return onChange(value, previous, token);
+                }
+            },
+            options);
+    }
+
+    /// <summary>
+    /// Asynchronous watch that does not need a cancellation token; see
+    /// <see cref="Watch{T}(Func{T}, Func{T, T, CancellationToken, Task}, EffectOptions?, IEqualityComparer{T}?)"/>.
+    /// Also keeps an <c>async (value, previous) =&gt;</c> lambda from becoming an <c>async void</c> handler.
+    /// </summary>
+    public static ReactiveEffect Watch<T>(
+        Func<T> source,
+        Func<T, T, Task> onChange,
+        EffectOptions? options = null,
+        IEqualityComparer<T>? comparer = null)
+    {
+        ArgumentNullException.ThrowIfNull(onChange);
+
+        return Watch(source, (value, previous, _) => onChange(value, previous), options, comparer);
     }
 
     internal static void ReportUnhandledEffectException(Exception exception)

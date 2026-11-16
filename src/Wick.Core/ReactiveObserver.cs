@@ -15,6 +15,10 @@ public abstract class ReactiveObserver : IDisposable
     [ThreadStatic]
     private static ReactiveObserver? t_current;
 
+    // The observer hidden by Untracked: reads skip it, but its rule against writes still applies.
+    [ThreadStatic]
+    private static ReactiveObserver? t_untracked;
+
     private readonly Lock _gate = new();
     private HashSet<ReactiveNode> _dependencies = [];
     private HashSet<ReactiveNode> _collecting = [];
@@ -137,6 +141,39 @@ public abstract class ReactiveObserver : IDisposable
     }
 
     /// <summary>
+    /// Stops collecting dependencies on the current thread until the returned scope is disposed. Writes stay forbidden
+    /// where the hidden observer forbids them.
+    /// </summary>
+    internal static UntrackedScope SuspendTracking()
+    {
+        var current = t_current;
+        if (current is null)
+        {
+            return default;
+        }
+
+        var scope = new UntrackedScope(current, t_untracked);
+        t_current = null;
+        t_untracked = current;
+
+        return scope;
+    }
+
+    internal readonly struct UntrackedScope(ReactiveObserver? current, ReactiveObserver? untracked) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (current is null)
+            {
+                return;
+            }
+
+            t_current = current;
+            t_untracked = untracked;
+        }
+    }
+
+    /// <summary>
     /// True for derived values: they are re-evaluated synchronously during a notification and are
     /// therefore invalidated before observers that schedule work (components, effects).
     /// </summary>
@@ -245,7 +282,8 @@ public abstract class ReactiveObserver : IDisposable
 
     internal static void ThrowIfTracking()
     {
-        if (t_current is not null && !t_current.AllowsMutation)
+        var observer = t_current ?? t_untracked;
+        if (observer is not null && !observer.AllowsMutation)
         {
             throw new InvalidOperationException(
                 "Reactive state cannot be mutated while dependencies are being tracked (for example during component rendering).");

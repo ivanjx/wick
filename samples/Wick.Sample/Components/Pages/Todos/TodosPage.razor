@@ -8,7 +8,8 @@
     Items are reactive objects in a <code>ReactiveList</code>. Toggling an item re-renders its row; the list
     reads the derived <code>Visible</code> and re-renders only when the set of shown items changes, which with
     <em>All</em> means only on add and remove. The summary reads the derived <code>Remaining</code>, and an
-    effect logs every change of it. <em>Complete all</em> writes every item inside <code>Reactive.Batch</code>.
+    effect logs every change of it. A watch logs filter changes with the filter they replace; unlike the effect, it
+    logs nothing at startup. <em>Complete all</em> writes every item inside <code>Reactive.Batch</code>.
 </p>
 
 <div class="cards">

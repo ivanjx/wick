@@ -36,7 +36,7 @@ public sealed partial class TodoState : IDisposable
     private readonly Derived<ImmutableArray<TodoItem>> _visible;
     private readonly Derived<int> _remaining;
     private readonly ReactiveEffect _logRemaining;
-    private int _logged;
+    private readonly ReactiveEffect _logFilter;
 
     public TodoState()
     {
@@ -52,17 +52,11 @@ public sealed partial class TodoState : IDisposable
 
         _remaining = Reactive.Derived(() => Items.Count(item => !item.Done));
 
-        // Effects may write state: the log is reactive too. Re-runs happen on the thread pool. The effect must not
-        // read Activity, or its own writes would re-trigger it; the cap is enforced with a plain counter instead.
-        _logRemaining = Reactive.Effect(() =>
-        {
-            Activity.Insert(0, $"{DateTime.Now:HH:mm:ss} · {Remaining} of {Items.Count} left");
+        // Effects may write state: the log is reactive too. Re-runs happen on the thread pool.
+        _logRemaining = Reactive.Effect(() => Log($"{Remaining} of {Items.Count} left"));
 
-            if (Interlocked.Increment(ref _logged) > MaxActivity)
-            {
-                Activity.RemoveAt(MaxActivity);
-            }
-        });
+        // A watch reacts to changes only, and receives the value it replaces.
+        _logFilter = Reactive.Watch(() => Filter, (filter, previous) => Log($"Filter {previous} → {filter}"));
     }
 
     public ReactiveList<TodoItem> Items { get; } =
@@ -97,10 +91,22 @@ public sealed partial class TodoState : IDisposable
         }
     });
 
+    private void Log(string entry)
+    {
+        Activity.Insert(0, $"{DateTime.Now:HH:mm:ss} · {entry}");
+
+        // Untracked: an effect that read the log while writing it would re-run for its own writes.
+        if (Reactive.Untracked(() => Activity.Count) > MaxActivity)
+        {
+            Activity.RemoveAt(MaxActivity);
+        }
+    }
+
     // Scoped per circuit: the container disposes the state when the circuit ends.
     public void Dispose()
     {
         _logRemaining.Dispose();
+        _logFilter.Dispose();
         _visible.Dispose();
         _remaining.Dispose();
     }

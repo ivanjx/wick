@@ -322,6 +322,37 @@ protected override void OnInitialized() => _query = Debounced(() => State.Query,
 
 `samples/Wick.Sample` has a listener timing page with a debounced autosave, a throttled preview and a debounced value.
 
+#### Reacting to changes: `Watch`
+
+An effect acts on the current state, so it runs at startup too. To react only to a *change*, and to see the value it replaces, use `Reactive.Watch`, or `Watch` in a component:
+
+```csharp
+protected override void OnInitialized()
+{
+    Watch(() => Auth.CurrentUser, (user, previous) => Cart.Clear());
+
+    // Saves after edits only, not when the page opens.
+    Watch(
+        () => State.Document,
+        async (document, _, token) => await storage.SaveAsync(document, token),
+        new EffectOptions { Debounce = TimeSpan.FromSeconds(2), FlushOnDispose = true });
+}
+```
+
+- **Tracking:** only the source is tracked. The handler runs untracked and may write state.
+- **Changes:** the handler runs only when the source's value differs from the previous one. Pass an `IEqualityComparer<T>` to decide what counts as a change. Values the source had only between two runs are skipped, for example within a debounce.
+- **Everything else** works as for effects: the returned `ReactiveEffect`, `EffectOptions`, async handlers with a token, and the component's dispatcher.
+
+#### Untracked reads
+
+To read state without depending on it, wrap the read in `Reactive.Untracked`. The effect below re-runs when the message changes, not when the language does:
+
+```csharp
+Effect(() => Notify(State.Message, Reactive.Untracked(() => Settings.Language)));
+```
+
+`Untracked` doesn't lift the rule against writes during a render.
+
 ### Changes Wick can't see
 
 If state was mutated behind Wick's back (a mutable object from a library, a `List<T>` you can't replace), tell the readers explicitly:

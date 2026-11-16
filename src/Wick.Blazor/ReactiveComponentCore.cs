@@ -92,6 +92,53 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     protected ReactiveEffect Effect(Func<Task> run, EffectOptions? options = null) => Own(Reactive.Effect(run, OnDispatcher(options)));
 
     /// <summary>
+    /// Component-owned form of <see cref="Reactive.Watch{T}(Func{T}, Action{T, T}, EffectOptions?, IEqualityComparer{T}?)"/>:
+    /// calls <paramref name="onChange"/> with the new and the previous value whenever the value of
+    /// <paramref name="source"/> changes, but not for its current value. Calls happen on the component's dispatcher,
+    /// and the watch is disposed together with the component:
+    /// <code>
+    /// Watch(() => Settings.Language, (language, previous) => Relocalize(language));
+    /// </code>
+    /// </summary>
+    /// <param name="source">Computes the watched value; reactive state it reads is tracked. It runs once immediately.</param>
+    /// <param name="onChange">Receives the new value, then the previous one; it runs untracked.</param>
+    /// <param name="options">
+    /// Error handling and timing, see <see cref="EffectOptions"/>. Without <see cref="EffectOptions.Dispatcher"/>, the
+    /// component's <see cref="ComponentBase.InvokeAsync(Func{Task})"/> is used.
+    /// </param>
+    /// <param name="comparer">Decides whether the value changed; <see cref="EqualityComparer{T}.Default"/> by default.</param>
+    protected ReactiveEffect Watch<T>(
+        Func<T> source,
+        Action<T, T> onChange,
+        EffectOptions? options = null,
+        IEqualityComparer<T>? comparer = null)
+        => Own(Reactive.Watch(source, onChange, OnDispatcher(options), comparer));
+
+    /// <summary>
+    /// Asynchronous component-owned watch; see
+    /// <see cref="Reactive.Watch{T}(Func{T}, Func{T, T, CancellationToken, Task}, EffectOptions?, IEqualityComparer{T}?)"/>.
+    /// Calls start on the component's dispatcher; disposing the component cancels the call in progress, unless
+    /// <see cref="EffectOptions.FlushOnDispose"/> is set.
+    /// </summary>
+    protected ReactiveEffect Watch<T>(
+        Func<T> source,
+        Func<T, T, CancellationToken, Task> onChange,
+        EffectOptions? options = null,
+        IEqualityComparer<T>? comparer = null)
+        => Own(Reactive.Watch(source, onChange, OnDispatcher(options), comparer));
+
+    /// <summary>
+    /// Asynchronous component-owned watch that does not need a cancellation token; see
+    /// <see cref="Watch{T}(Func{T}, Func{T, T, CancellationToken, Task}, EffectOptions?, IEqualityComparer{T}?)"/>.
+    /// </summary>
+    protected ReactiveEffect Watch<T>(
+        Func<T> source,
+        Func<T, T, Task> onChange,
+        EffectOptions? options = null,
+        IEqualityComparer<T>? comparer = null)
+        => Own(Reactive.Watch(source, onChange, OnDispatcher(options), comparer));
+
+    /// <summary>
     /// Component-owned form of <see cref="Reactive.Debounced{T}"/>: a value that follows <paramref name="read"/> once
     /// it has stopped changing for <paramref name="delay"/>, disposed together with the component.
     /// </summary>
