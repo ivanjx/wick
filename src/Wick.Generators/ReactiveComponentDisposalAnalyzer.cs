@@ -40,7 +40,7 @@ public sealed class ReactiveComponentDisposalAnalyzer : DiagnosticAnalyzer
     private static void Analyze(SymbolAnalysisContext context, INamedTypeSymbol componentCore, INamedTypeSymbol? asyncDisposable)
     {
         var type = (INamedTypeSymbol)context.Symbol;
-        if (!DerivesFrom(type, componentCore))
+        if (!TypeHelpers.DerivesFrom(type, componentCore))
         {
             return;
         }
@@ -77,18 +77,5 @@ public sealed class ReactiveComponentDisposalAnalyzer : DiagnosticAnalyzer
                && !method.IsOverride
                && method.Parameters.IsEmpty
                && method.Name is "Dispose" or "DisposeAsync";
-    }
-
-    private static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol baseType)
-    {
-        for (var current = type.BaseType; current is not null; current = current.BaseType)
-        {
-            if (SymbolEqualityComparer.Default.Equals(current, baseType))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

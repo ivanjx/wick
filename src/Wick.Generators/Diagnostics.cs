@@ -85,4 +85,45 @@ internal static class Diagnostics
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor RedundantPropertyChangedSubscription = new(
+        id: "WK0011",
+        title: "PropertyChanged subscription only re-renders a reactive component",
+        messageFormat: "This PropertyChanged subscription only re-renders '{0}', which already re-renders when the reactive state its rendering reads changes; remove it",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "Reported when the handler only calls StateHasChanged, directly or through InvokeAsync, optionally behind a condition on the event's PropertyName, and the object is a [ReactiveState] type whose PropertyChanged event Wick generates. State the component hands to non-reactive child components is not read by its own rendering; wrap such content in <ReactiveRegion> before removing the subscription.");
+
+    public static readonly DiagnosticDescriptor ObservablePropertyCanBeReactive = new(
+        id: "WK0012",
+        title: "CommunityToolkit.Mvvm observable properties can become reactive properties",
+        messageFormat: "'{0}' declares [ObservableProperty] members; it can become a [ReactiveState] class with partial properties",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor PropertyClaimedByOtherGenerator = new(
+        id: "WK0013",
+        title: "Partial property is implemented by another source generator",
+        messageFormat: "Partial property '{0}' is implemented by another source generator ([{1}]); it is not reactive",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor StateHasChangedInReactiveComponent = new(
+        id: "WK0014",
+        title: "StateHasChanged in a reactive component",
+        messageFormat: "'{0}' re-renders when the reactive state its rendering reads changes; StateHasChanged is only needed for changes to non-reactive state",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: false);
+
+    public static readonly DiagnosticDescriptor InvalidNotifyPropertyChanged = new(
+        id: "WK0015",
+        title: "Generated properties cannot raise PropertyChanged",
+        messageFormat: "[ReactiveState(NotifyPropertyChanged = true)] cannot be used on '{0}': {1}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

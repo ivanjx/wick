@@ -17,9 +17,10 @@ internal static class CodeFixRunner
 
     /// <summary>
     /// Applies the first fix offered for the <paramref name="id"/> diagnostic in <c>Consumer.cs</c> (the one reported
-    /// on <paramref name="at"/> if given) and returns the fixed text. <paramref name="otherSources"/> become other files.
+    /// on <paramref name="at"/> if given), or the one titled <paramref name="title"/>, and returns the fixed text.
+    /// <paramref name="otherSources"/> become other files.
     /// </summary>
-    public static async Task<string> FixAsync(CodeFixProvider provider, string id, string source, string? at = null, params string[] otherSources)
+    public static async Task<string> FixAsync(CodeFixProvider provider, string id, string source, string? at = null, string? title = null, params string[] otherSources)
     {
         var (document, diagnostics) = await AnalyzeAsync(source, otherSources);
         var diagnostic = diagnostics.First(candidate => IsReported(candidate, id) && (at is null || source[candidate.Location.SourceSpan.Start..candidate.Location.SourceSpan.End] == at));
@@ -27,7 +28,7 @@ internal static class CodeFixRunner
         var actions = await GetActionsAsync(provider, document, diagnostic);
         Assert.NotEmpty(actions);
 
-        return await ApplyAsync(document, actions[0]);
+        return await ApplyAsync(document, title is null ? actions[0] : actions.Single(action => action.Title == title));
     }
 
     /// <summary>Applies the fix-all of the first fix to every <paramref name="id"/> diagnostic in <c>Consumer.cs</c>.</summary>
@@ -93,7 +94,7 @@ internal static class CodeFixRunner
         GeneratorRunner.CreateDriver().RunGeneratorsAndUpdateCompilation(compilation, out var output, out var generatorDiagnostics);
 
         var analyzerDiagnostics = await output
-            .WithAnalyzers([new ReactiveStateAnalyzer(), new ReactiveComponentDisposalAnalyzer()])
+            .WithAnalyzers([new ReactiveStateAnalyzer(), new ReactiveComponentDisposalAnalyzer(), new PropertyChangedSubscriptionAnalyzer(), new ObservablePropertyAnalyzer()])
             .GetAnalyzerDiagnosticsAsync(TestContext.Current.CancellationToken);
 
         return

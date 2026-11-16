@@ -10,4 +10,8 @@ internal static class DiagnosticIds
     public const string MutableCollectionProperty = "WK0006";
 
     public const string DisposalBypassesReactiveCleanup = "WK0007";
+
+    public const string RedundantPropertyChangedSubscription = "WK0011";
+
+    public const string ObservablePropertyCanBeReactive = "WK0012";
 }

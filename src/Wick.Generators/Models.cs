@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.Text;
 namespace Wick.Generators;
 
 /// <summary>Everything needed to emit one reactive state type. Value-equatable so the pipeline caches.</summary>
+/// <param name="PropertyChanged">Whether setters raise <c>INotifyPropertyChanged.PropertyChanged</c>, and who declares it.</param>
 internal sealed record StateModel(
     string HintName,
     string? Namespace,
@@ -16,6 +17,7 @@ internal sealed record StateModel(
     TypeHeader Type,
     bool IsSealed,
     bool HasReactiveBase,
+    PropertyChangedKind PropertyChanged,
     EquatableArray<PropertyModel> Properties);
 
 /// <summary>A <c>partial</c> type declaration header, e.g. keyword <c>record struct</c> and name <c>Outer&lt;T&gt;</c>.</summary>
@@ -48,6 +50,19 @@ internal enum EqualityKind
     Reference,
     Never,
     Comparer,
+}
+
+/// <summary>How generated setters raise <c>INotifyPropertyChanged.PropertyChanged</c>.</summary>
+internal enum PropertyChangedKind
+{
+    /// <summary>They don't.</summary>
+    None,
+
+    /// <summary>They call the type's existing <c>OnPropertyChanged(string)</c>, its own or inherited.</summary>
+    Call,
+
+    /// <summary>The interface, the event and <c>OnPropertyChanged(string)</c> are generated, and setters call it.</summary>
+    Declare,
 }
 
 /// <summary>A diagnostic without syntax tree references, so it does not defeat incremental caching.</summary>

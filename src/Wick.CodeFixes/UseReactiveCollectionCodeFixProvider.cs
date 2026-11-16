@@ -124,7 +124,7 @@ public sealed class UseReactiveCollectionCodeFixProvider : CodeFixProvider
         var fixedRoot = root.ReplaceNode(property, fixedProperty);
         if (scope == NameScope.Missing)
         {
-            fixedRoot = AddUsing(fixedRoot);
+            fixedRoot = SyntaxHelpers.AddUsing(fixedRoot, CoreNamespace);
         }
 
         return document.WithSyntaxRoot(fixedRoot);
@@ -264,79 +264,6 @@ public sealed class UseReactiveCollectionCodeFixProvider : CodeFixProvider
         var separators = Enumerable.Repeat(Token(TriviaList(), SyntaxKind.CommaToken, TriviaList(Space)), Math.Max(kept.Count - 1, 0));
 
         return arguments.WithArguments(SeparatedList(kept.Select((argument, index) => index == 0 ? argument.WithoutLeadingTrivia() : argument), separators));
-    }
-
-    /// <summary>
-    /// Adds <c>using Wick.Core;</c> among the file's usings (System ones first, then alphabetical), or at the top of
-    /// the file after any header comment if it has none.
-    /// </summary>
-    private static CompilationUnitSyntax AddUsing(CompilationUnitSyntax root)
-    {
-        var endOfLine = SyntaxHelpers.EndOfLine(root);
-        var directive = UsingDirective(ParseName(CoreNamespace))
-            .WithUsingKeyword(Token(TriviaList(), SyntaxKind.UsingKeyword, TriviaList(Space)))
-            .WithSemicolonToken(Token(TriviaList(), SyntaxKind.SemicolonToken, TriviaList(endOfLine)));
-
-        if (root.Usings.Count > 0)
-        {
-            return root.WithUsings(Insert(root.Usings, directive));
-        }
-
-        if (root.Members.OfType<BaseNamespaceDeclarationSyntax>().FirstOrDefault() is { Usings.Count: > 0 } namespaceDeclaration)
-        {
-            return root.ReplaceNode(namespaceDeclaration, namespaceDeclaration.WithUsings(Insert(namespaceDeclaration.Usings, directive)));
-        }
-
-        var first = root.GetFirstToken(includeZeroWidth: true);
-
-        return root
-            .ReplaceToken(first, first.WithLeadingTrivia())
-            .WithUsings(SingletonList(directive.WithLeadingTrivia(first.LeadingTrivia).WithTrailingTrivia(endOfLine, endOfLine)));
-    }
-
-    private static SyntaxList<UsingDirectiveSyntax> Insert(SyntaxList<UsingDirectiveSyntax> usings, UsingDirectiveSyntax directive)
-    {
-        var index = -1;
-        var lastPlain = -1;
-        for (var candidate = 0; candidate < usings.Count; candidate++)
-        {
-            var existing = usings[candidate];
-            if (existing.Alias is not null || !existing.StaticKeyword.IsKind(SyntaxKind.None) || !existing.GlobalKeyword.IsKind(SyntaxKind.None) || existing.Name is null)
-            {
-                continue;
-            }
-
-            lastPlain = candidate;
-            if (Compare(existing.Name.ToString(), CoreNamespace) > 0)
-            {
-                index = candidate;
-                break;
-            }
-        }
-
-        if (index < 0)
-        {
-            // After the last plain using; with none, after all usings (static and alias ones included).
-            var position = lastPlain >= 0 ? lastPlain + 1 : usings.Count;
-
-            return usings.Insert(position, directive.WithLeadingTrivia(SyntaxHelpers.Indentation(usings[position - 1].GetFirstToken())));
-        }
-
-        // The new directive takes over the displaced one's leading trivia (header comments, blank lines).
-        var displaced = usings[index];
-        var indentation = SyntaxHelpers.Indentation(displaced.GetFirstToken());
-
-        return usings
-            .Replace(displaced, displaced.WithLeadingTrivia(indentation))
-            .Insert(index, directive.WithLeadingTrivia(displaced.GetLeadingTrivia()));
-
-        static int Compare(string left, string right)
-        {
-            var leftIsSystem = left == "System" || left.StartsWith("System.", StringComparison.Ordinal);
-            var rightIsSystem = right == "System" || right.StartsWith("System.", StringComparison.Ordinal);
-
-            return leftIsSystem != rightIsSystem ? (leftIsSystem ? -1 : 1) : string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
-        }
     }
 
     private enum NameScope

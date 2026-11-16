@@ -15,3 +15,8 @@ WK0007 | Wick | Warning | Reactive component declares its own disposal
 WK0008 | Wick | Warning | Writing to an element of a reactive array property is not tracked
 WK0009 | Wick | Error | Invalid [ReactiveEquality]
 WK0010 | Wick | Warning | [ReactiveEquality] has no effect
+WK0011 | Wick | Info | PropertyChanged subscription only re-renders a reactive component
+WK0012 | Wick | Info | CommunityToolkit.Mvvm observable properties can become reactive properties
+WK0013 | Wick | Warning | Partial property is implemented by another source generator
+WK0014 | Wick | Disabled | StateHasChanged in a reactive component
+WK0015 | Wick | Error | Generated properties cannot raise PropertyChanged

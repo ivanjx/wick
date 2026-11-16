@@ -19,7 +19,7 @@ public sealed class ReactiveStateAnalyzer : DiagnosticAnalyzer
     private const string BlazorNamespace = "Microsoft.AspNetCore.Components";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-        [Diagnostics.AutoPropertyIsNotReactive, Diagnostics.MutableCollectionProperty, Diagnostics.EqualityHasNoEffect];
+        [Diagnostics.AutoPropertyIsNotReactive, Diagnostics.MutableCollectionProperty, Diagnostics.EqualityHasNoEffect, Diagnostics.PropertyClaimedByOtherGenerator];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -66,6 +66,18 @@ public sealed class ReactiveStateAnalyzer : DiagnosticAnalyzer
                 if (IsWritableAutoProperty(property, syntax) && !IsSetByBlazor(property))
                 {
                     context.ReportDiagnostic(Diagnostic.Create(Diagnostics.AutoPropertyIsNotReactive, location, property.Name));
+                }
+
+                continue;
+            }
+
+            var claim = OtherGenerators.FindClaim(property);
+            if (claim is not null)
+            {
+                // Static properties could never be reactive; the generator skips them without a word.
+                if (!property.IsStatic)
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.PropertyClaimedByOtherGenerator, location, property.Name, OtherGenerators.DisplayName(claim)));
                 }
 
                 continue;

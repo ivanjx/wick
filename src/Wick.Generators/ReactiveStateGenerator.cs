@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
@@ -25,7 +26,9 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
     private const string AttributeMetadataName = "Wick.Core.ReactiveStateAttribute";
     private const string EqualityAttributeMetadataName = "Wick.Core.ReactiveEqualityAttribute";
     private const string ReactiveObjectMetadataName = "Wick.Core.ReactiveObject";
+    private const string NotifyPropertyChangedMetadataName = "System.ComponentModel.INotifyPropertyChanged";
     private const string Core = "global::Wick.Core";
+    private const string PropertyChangedNamespace = "global::System.ComponentModel";
     private const string NodeFieldPrefix = "__reactiveNode_";
     private const string ComparerFieldPrefix = "__reactiveComparer_";
     private const string FindNodeMethod = "__FindReactiveNode";
@@ -80,6 +83,12 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             diagnostics.Add(DiagnosticInfo.Create(Diagnostics.UnsupportedType, declaration.Identifier.GetLocation(), typeName, typeProblem));
         }
 
+        var propertyChangedProblem = ReadPropertyChanged(type, context.Attributes[0], context.SemanticModel.Compilation, out var propertyChanged);
+        if (propertyChangedProblem is not null)
+        {
+            diagnostics.Add(DiagnosticInfo.Create(Diagnostics.InvalidNotifyPropertyChanged, declaration.Identifier.GetLocation(), typeName, propertyChangedProblem));
+        }
+
         var properties = ImmutableArray.CreateBuilder<PropertyModel>();
         foreach (var property in type.GetMembers().OfType<IPropertySymbol>())
         {
@@ -93,6 +102,13 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             // Warnings about properties (WK0002, WK0006) come from ReactiveStateAnalyzer: only analyzer
             // diagnostics have syntax tree locations, which #pragma and .editorconfig suppressions need.
             if (!property.IsPartialDefinition)
+            {
+                continue;
+            }
+
+            // Implemented by another generator, which cannot see our implementation nor we its. ReactiveStateAnalyzer
+            // reports instance properties (WK0013); static ones could never be reactive.
+            if (OtherGenerators.FindClaim(property) is not null)
             {
                 continue;
             }
@@ -135,6 +151,7 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             Type: CreateHeader(declaration),
             IsSealed: type.IsSealed,
             HasReactiveBase: HasReactiveBase(type),
+            PropertyChanged: propertyChanged,
             Properties: new EquatableArray<PropertyModel>(properties.ToImmutable()));
 
         return new GenerationResult(state, new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()));
@@ -164,6 +181,84 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Reads <c>NotifyPropertyChanged</c>, which derived reactive types inherit; returns why it cannot be used, or null.
+    /// Generators do not see their own output, so a reactive base that requested the event counts as declaring the
+    /// <c>OnPropertyChanged(string)</c> generated for it.
+    /// </summary>
+    private static string? ReadPropertyChanged(INamedTypeSymbol type, AttributeData attribute, Compilation compilation, out PropertyChangedKind kind)
+    {
+        kind = PropertyChangedKind.None;
+
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.GetAttributes().Any(candidate => candidate.AttributeClass?.ToDisplayString() == AttributeMetadataName && RequestsPropertyChanged(candidate)))
+            {
+                kind = PropertyChangedKind.Call;
+                return null;
+            }
+        }
+
+        if (!RequestsPropertyChanged(attribute))
+        {
+            return null;
+        }
+
+        var notifying = compilation.GetTypeByMetadataName(NotifyPropertyChangedMetadataName);
+        if (notifying is not null && type.AllInterfaces.Contains(notifying, SymbolEqualityComparer.Default))
+        {
+            if (!HasOnPropertyChanged(type, compilation))
+            {
+                return "it implements INotifyPropertyChanged without an accessible OnPropertyChanged(string) method for the generated setters to call";
+            }
+
+            kind = PropertyChangedKind.Call;
+            return null;
+        }
+
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            var conflict = current.GetMembers().FirstOrDefault(member =>
+                !member.IsImplicitlyDeclared
+                && member.Name is "PropertyChanged" or "OnPropertyChanged"
+                && (SymbolEqualityComparer.Default.Equals(current, type) || compilation.IsSymbolAccessibleWithin(member, type)));
+
+            if (conflict is not null)
+            {
+                return $"'{conflict.ToDisplayString(SymbolDisplayFormat.CSharpShortErrorMessageFormat)}' conflicts with the generated PropertyChanged event and OnPropertyChanged method; implement INotifyPropertyChanged with an OnPropertyChanged(string) method instead";
+            }
+        }
+
+        kind = PropertyChangedKind.Declare;
+        return null;
+    }
+
+    private static bool RequestsPropertyChanged(AttributeData attribute)
+        => attribute.NamedArguments.Any(argument => argument.Key == "NotifyPropertyChanged" && argument.Value.Value is true);
+
+    /// <summary>An <c>OnPropertyChanged</c> instance method the generated setters can call with a property name.</summary>
+    private static bool HasOnPropertyChanged(INamedTypeSymbol type, Compilation compilation)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            foreach (var method in current.GetMembers("OnPropertyChanged").OfType<IMethodSymbol>())
+            {
+                if (!method.IsStatic
+                    && method.TypeParameters.IsEmpty
+                    && method.Parameters.Length > 0
+                    && method.Parameters[0].Type.SpecialType == SpecialType.System_String
+                    && method.Parameters[0].RefKind == RefKind.None
+                    && method.Parameters.Skip(1).All(parameter => parameter.IsOptional)
+                    && compilation.IsSymbolAccessibleWithin(method, type))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static string? FindPropertyProblem(IPropertySymbol property, PropertyDeclarationSyntax syntax)
@@ -371,14 +466,31 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             writer.Open();
         }
 
-        writer.Line(state.HasReactiveBase
+        List<string> interfaces = state.HasReactiveBase ? [] : [$"{Core}.IReactiveState"];
+        if (state.PropertyChanged == PropertyChangedKind.Declare)
+        {
+            interfaces.Add(PropertyChangedNamespace + ".INotifyPropertyChanged");
+        }
+
+        writer.Line(interfaces.Count == 0
             ? $"partial {state.Type.Keyword} {state.Type.Name}"
-            : $"partial {state.Type.Keyword} {state.Type.Name} : {Core}.IReactiveState");
+            : $"partial {state.Type.Keyword} {state.Type.Name} : {string.Join(", ", interfaces)}");
         writer.Open();
 
         foreach (var property in state.Properties)
         {
             writer.Line($"private {Core}.ReactiveNode? {NodeFieldPrefix}{property.Name};");
+        }
+
+        if (state.PropertyChanged == PropertyChangedKind.Declare)
+        {
+            writer.Line();
+            writer.Line("/// <inheritdoc/>");
+            writer.Line($"public event {PropertyChangedNamespace}.PropertyChangedEventHandler? PropertyChanged;");
+            writer.Line();
+            writer.Line("/// <summary>Raises <see cref=\"PropertyChanged\"/>; the generated setters call it when a write notifies.</summary>");
+            writer.Line("/// <param name=\"propertyName\">The name of the property that changed.</param>");
+            writer.Line($"{(state.IsSealed ? "private" : "protected virtual")} void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new {PropertyChangedNamespace}.PropertyChangedEventArgs(propertyName));");
         }
 
         foreach (var property in state.Properties)
@@ -417,9 +529,43 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             writer.Line($"{property.Modifiers} {property.Type} {property.Identifier}");
             writer.Open();
             writer.Line($"{Prefix(property.GetModifiers)}get => {Core}.ReactiveProperty.Get(ref field, ref {node}, {nodeName});");
-            writer.Line(isInit
-                ? $"{Prefix(property.SetModifiers)}init => field = value;"
-                : $"{Prefix(property.SetModifiers)}set => {setter};");
+
+            if (isInit)
+            {
+                writer.Line($"{Prefix(property.SetModifiers)}init => field = value;");
+            }
+            else if (state.PropertyChanged == PropertyChangedKind.None)
+            {
+                writer.Line($"{Prefix(property.SetModifiers)}set => {setter};");
+            }
+            else
+            {
+                // The comparison happens here rather than in ReactiveProperty so the event is raised only on a change.
+                var equals = property.Equality switch
+                {
+                    EqualityKind.Reference => "global::System.Object.ReferenceEquals(field, value)",
+                    EqualityKind.Never => null,
+                    EqualityKind.Comparer => $"{ComparerFieldPrefix}{property.Name}.Equals(field, value)",
+                    _ => $"global::System.Collections.Generic.EqualityComparer<{property.Type}>.Default.Equals(field, value)",
+                };
+
+                writer.Line($"{Prefix(property.SetModifiers)}set");
+                writer.Open();
+
+                if (equals is not null)
+                {
+                    writer.Line($"if ({equals})");
+                    writer.Open();
+                    writer.Line("return;");
+                    writer.Close();
+                    writer.Line();
+                }
+
+                writer.Line($"{Core}.ReactiveProperty.SetAlways(ref field, value, ref {node});");
+                writer.Line($"OnPropertyChanged({SymbolDisplay.FormatLiteral(property.Name, quote: true)});");
+                writer.Close();
+            }
+
             writer.Close();
 
             if (!matchesFileContext)

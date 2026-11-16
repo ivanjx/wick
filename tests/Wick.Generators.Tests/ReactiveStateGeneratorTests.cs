@@ -172,6 +172,56 @@ public sealed class ReactiveStateGeneratorTests
             }
             """
         },
+        {
+            "state that raises PropertyChanged",
+            """
+            using System.Collections.Generic;
+            using System.ComponentModel;
+            using Wick.Core;
+
+            [ReactiveState(NotifyPropertyChanged = true)]
+            public partial class Settings
+            {
+                public partial string Language { get; set; } = "en";
+
+                [ReactiveEquality(ReactiveEqualityMode.Reference)]
+                public partial IReadOnlyList<int> Items { get; set; } = [];
+
+                public partial int Fixed { get; init; }
+
+                public void Listen() => PropertyChanged += (_, e) => System.Console.WriteLine(e.PropertyName);
+            }
+
+            [ReactiveState(NotifyPropertyChanged = true)]
+            public sealed partial class Sealed
+            {
+                public partial int Count { get; set; }
+            }
+
+            [ReactiveState(NotifyPropertyChanged = true)]
+            public partial class Box<T>
+            {
+                public partial T? Value { get; set; }
+            }
+
+            [ReactiveState(NotifyPropertyChanged = true)]
+            public partial class Derived : Settings
+            {
+                public partial bool Dark { get; set; }
+            }
+
+            [ReactiveState(NotifyPropertyChanged = true)]
+            public partial class Existing : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+
+                public partial int Count { get; set; }
+
+                protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+                    => PropertyChanged?.Invoke(this, new(name));
+            }
+            """
+        },
     };
 
     public static TheoryData<string, string> InvalidDeclarations => new()
@@ -193,6 +243,10 @@ public sealed class ReactiveStateGeneratorTests
         { "WK0010", "public class State { [ReactiveEquality(ReactiveEqualityMode.Never)] public int A { get; set; } }" },
         { "WK0010", "[ReactiveState] public partial class State { [ReactiveEquality(ReactiveEqualityMode.Never)] public partial int A { get; init; } }" },
         { "WK0010", "[ReactiveState] public partial class State { [ReactiveEquality(ReactiveEqualityMode.Never)] public int A { get; set; } }" },
+        { "WK0013", "[ReactiveState] public partial class State { [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty] public partial int A { get; set; } } namespace CommunityToolkit.Mvvm.ComponentModel { public sealed class ObservablePropertyAttribute : System.Attribute { } }" },
+        { "WK0015", "[ReactiveState(NotifyPropertyChanged = true)] public partial class State : System.ComponentModel.INotifyPropertyChanged { public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged; public partial int A { get; set; } }" },
+        { "WK0015", "[ReactiveState(NotifyPropertyChanged = true)] public partial class State { public void OnPropertyChanged() { } public partial int A { get; set; } }" },
+        { "WK0015", "[ReactiveState(NotifyPropertyChanged = true)] public partial class State : System.ComponentModel.INotifyPropertyChanged { public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged; private void OnPropertyChanged(ref string name) { } public partial int A { get; set; } }" },
     };
 
     [Theory]

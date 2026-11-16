@@ -283,7 +283,7 @@ public sealed class OverrideDisposalCodeFixProvider : CodeFixProvider
 
             var fixedRoot = root.ReplaceNodes(nodes, (original, current) => original == method
                 ? rewritten
-                : RemoveBaseType((TypeDeclarationSyntax)current, removals[(TypeDeclarationSyntax)original]));
+                : SyntaxHelpers.RemoveBaseType((TypeDeclarationSyntax)current, removals[(TypeDeclarationSyntax)original]));
 
             solution = solution.WithDocumentSyntaxRoot(target.Id, fixedRoot);
         }
@@ -302,28 +302,5 @@ public sealed class OverrideDisposalCodeFixProvider : CodeFixProvider
         };
 
         return implemented.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate.ContainingType, interfaceType));
-    }
-
-    private static TypeDeclarationSyntax RemoveBaseType(TypeDeclarationSyntax declaration, int index)
-    {
-        var baseList = declaration.BaseList!;
-        var types = baseList.Types;
-
-        if (types.Count == 1)
-        {
-            // `class View : IDisposable` becomes `class View`; the token before the colon takes over the line ending.
-            var previous = baseList.ColonToken.GetPreviousToken();
-            var withoutList = declaration.ReplaceToken(previous, previous.WithTrailingTrivia(baseList.GetTrailingTrivia()));
-
-            return withoutList.WithBaseList(null);
-        }
-
-        var remaining = types.RemoveAt(index);
-        if (index == types.Count - 1)
-        {
-            remaining = remaining.Replace(remaining.Last(), remaining.Last().WithTrailingTrivia(types[index].GetTrailingTrivia()));
-        }
-
-        return declaration.WithBaseList(baseList.WithTypes(remaining));
     }
 }

@@ -499,6 +499,27 @@ public async Task Shows_the_new_count()
 
 It waits for the whole process, so tests running in parallel can delay it, but never make it return early. It also waits for async effect runs until they complete, so make sure fake APIs used by an effect eventually return. A debounced or throttled run counts as pending while it waits, so advance a `FakeTimeProvider` or call `FlushAsync()` before waiting.
 
+### Migrating from `INotifyPropertyChanged`
+
+State classes built on `INotifyPropertyChanged`, such as CommunityToolkit.Mvvm's `ObservableObject`, can move over one class at a time. `[ReactiveState(NotifyPropertyChanged = true)]` makes the generated setters also raise `PropertyChanged` (once per actual change, after readers are notified; init accessors don't raise it), so existing listeners keep working while components switch to reactive rendering:
+
+```csharp
+[ReactiveState(NotifyPropertyChanged = true)]
+public partial class SettingsState
+{
+    public partial string Language { get; set; } = "en";
+}
+```
+
+Wick declares the event and a `protected virtual void OnPropertyChanged(string propertyName)` (private in a sealed class). If the class already implements `INotifyPropertyChanged`, Wick calls its `OnPropertyChanged(string)` instead. Reactive subclasses of a notifying class raise the event too.
+
+The analyzers help with the rest:
+
+- **WK0012** points out classes using the toolkit's `[ObservableProperty]`. Its quick fix turns `[ObservableProperty] private string _language = "en";` into `public partial string Language { get; set; } = "en";` (`[property: ...]` attributes move to the property), removes the `ObservableObject` base and adds `[ReactiveState]`, with or without `NotifyPropertyChanged = true`. It's offered only when the class uses nothing else from the toolkit: no `[NotifyPropertyChangedFor]` or other toolkit attributes, no `OnLanguageChanged` hooks, no `SetProperty` or `OnPropertyChanged` calls, and no direct use of the fields.
+- **WK0011** points out `State.PropertyChanged += ...` in a reactive component when the handler only calls `StateHasChanged()` or `InvokeAsync(StateHasChanged)`, possibly behind a check of `e.PropertyName`. The component already re-renders when state it rendered changes. The quick fix removes the subscription, the matching `-=` and the handler if nothing else uses it. It's reported only when the event is the one Wick generates and no hand-written code raises it. A component that hands this state to non-reactive child content needs [`<ReactiveRegion>`](#content-passed-into-non-reactive-components) there.
+- **WK0014** (off by default) points out remaining `StateHasChanged()` calls in reactive components. Turn it on with `dotnet_diagnostic.WK0014.severity = suggestion` in `.editorconfig`.
+- **WK0013** warns when another source generator (CommunityToolkit.Mvvm, ReactiveUI, `[GeneratedRegex]`) implements a partial property of a reactive type. Wick leaves that property to the other generator, so it isn't reactive.
+
 ## Diagnostics
 
 | ID | Severity | Meaning |
@@ -513,8 +534,13 @@ It waits for the whole process, so tests running in parallel can delay it, but n
 | WK0008 | Warning | An element of an array held by a reactive property is written in place; readers are not notified |
 | WK0009 | Error | `[ReactiveEquality]` is invalid: reference equality on a value type, or a comparer type that can't be created or doesn't compare the property's type |
 | WK0010 | Warning | `[ReactiveEquality]` has no effect: the property isn't a generated reactive property with a setter |
+| WK0011 | Info | A `PropertyChanged` subscription in a reactive component only re-renders it, which Wick already does |
+| WK0012 | Info | A CommunityToolkit.Mvvm `[ObservableProperty]` class can become a `[ReactiveState]` class |
+| WK0013 | Warning | Another source generator implements this partial property, so it is not reactive |
+| WK0014 | Info (off by default) | `StateHasChanged()` in a reactive component, which re-renders by itself |
+| WK0015 | Error | `NotifyPropertyChanged = true` can't be used: the type implements `INotifyPropertyChanged` without a usable `OnPropertyChanged(string)`, or declares members named `PropertyChanged`/`OnPropertyChanged` |
 
-WK0001, WK0002, WK0006 and WK0007 come with IDE quick fixes: add `partial`, switch to the reactive collection, or override `Dispose(bool)`/`DisposeAsyncCore()`. For WK0007, the fix only applies to C# files; in a `.razor` file, move the cleanup into the override yourself.
+WK0001, WK0002, WK0006, WK0007, WK0011 and WK0012 come with IDE quick fixes: add `partial`, switch to the reactive collection, override `Dispose(bool)`/`DisposeAsyncCore()`, remove the redundant subscription, or convert the toolkit class. For WK0007 and WK0011, the fix only applies to C# files; in a `.razor` file, make the change yourself.
 
 Warnings can be suppressed with `#pragma warning disable` or in `.editorconfig`.
 
