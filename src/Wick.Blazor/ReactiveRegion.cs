@@ -10,8 +10,10 @@ namespace Wick.Blazor;
 /// </summary>
 public sealed class ReactiveRegion : ReactiveComponentBase
 {
+    /// <summary>The content to render and track; reactive state it reads re-renders only this region.</summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
+    /// <summary>Renders <see cref="ChildContent"/>.</summary>
     protected override void BuildRenderTree(RenderTreeBuilder builder) => builder.AddContent(0, ChildContent);
 }

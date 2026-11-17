@@ -15,5 +15,6 @@ public readonly struct TrackingScope : IDisposable
         _previous = previous;
     }
 
+    /// <summary>Ends dependency collection and restores the observer that was tracking before, if any.</summary>
     public void Dispose() => _owner?.EndTracking(_previous);
 }

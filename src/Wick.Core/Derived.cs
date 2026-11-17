@@ -78,6 +78,10 @@ public sealed class Derived<T> : IDisposable, IReactiveObserverOwner
         }
     }
 
+    /// <summary>
+    /// Releases the subscriptions to the state the computation read; reading <see cref="Value"/> afterwards throws
+    /// <see cref="ObjectDisposedException"/>.
+    /// </summary>
     public void Dispose()
     {
         lock (_gate)

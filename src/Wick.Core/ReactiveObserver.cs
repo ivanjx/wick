@@ -1,14 +1,19 @@
 namespace Wick.Core;
 
 /// <summary>
-/// Something that depends on reactive state (a component render, later derived state or effects).
-/// Dependencies are collected while a <see cref="TrackingScope"/> is active on the current thread
-/// and reconciled when the scope ends: nodes that were not read again are unsubscribed.
+/// Base class for code that depends on reactive state. Reads made between <see cref="BeginTracking"/> and the
+/// disposal of the returned <see cref="TrackingScope"/> become the observer's dependencies, and
+/// <see cref="OnInvalidated"/> is called when one of them changes. Each tracking pass replaces the previous
+/// dependencies: nodes that were not read again are unsubscribed.
 /// </summary>
 /// <remarks>
+/// Wick's components, effects and derived values are built on this class; prefer them unless you integrate another
+/// UI framework. Reactive state cannot be written while an observer of your own is tracking.
+/// <para>
 /// The tracking context is thread-static on purpose. Tracking covers only synchronous reads made
 /// between <see cref="BeginTracking"/> and the scope's disposal; it must not flow into async
 /// continuations or work started on other threads, which <see cref="AsyncLocal{T}"/> would do.
+/// </para>
 /// </remarks>
 public abstract class ReactiveObserver : IDisposable
 {
@@ -42,6 +47,7 @@ public abstract class ReactiveObserver : IDisposable
         }
     }
 
+    /// <summary>Whether <see cref="Dispose"/> was called; a disposed observer is no longer invalidated.</summary>
     protected bool IsDisposed => _disposed;
 
     /// <summary>

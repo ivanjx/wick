@@ -1,0 +1,30 @@
+#nullable enable
+Wick.Blazor.ReactiveComponentBase
+Wick.Blazor.ReactiveComponentBase.ReactiveComponentBase() -> void
+Wick.Blazor.ReactiveComponentCore
+Wick.Blazor.ReactiveComponentCore.Debounced<T>(System.Func<T>! read, System.TimeSpan delay, System.TimeProvider? timeProvider = null) -> Wick.Core.Debounced<T>!
+Wick.Blazor.ReactiveComponentCore.Dispose() -> void
+Wick.Blazor.ReactiveComponentCore.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Wick.Blazor.ReactiveComponentCore.Effect(System.Action! run, Wick.Core.EffectOptions? options = null) -> Wick.Core.ReactiveEffect!
+Wick.Blazor.ReactiveComponentCore.Effect(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! run, Wick.Core.EffectOptions? options = null) -> Wick.Core.ReactiveEffect!
+Wick.Blazor.ReactiveComponentCore.Effect(System.Func<System.Threading.Tasks.Task!>! run, Wick.Core.EffectOptions? options = null) -> Wick.Core.ReactiveEffect!
+Wick.Blazor.ReactiveComponentCore.ReactiveComponentCore() -> void
+Wick.Blazor.ReactiveComponentCore.Watch<T>(System.Func<T>! source, System.Action<T, T>! onChange, Wick.Core.EffectOptions? options = null, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> Wick.Core.ReactiveEffect!
+Wick.Blazor.ReactiveComponentCore.Watch<T>(System.Func<T>! source, System.Func<T, T, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! onChange, Wick.Core.EffectOptions? options = null, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> Wick.Core.ReactiveEffect!
+Wick.Blazor.ReactiveComponentCore.Watch<T>(System.Func<T>! source, System.Func<T, T, System.Threading.Tasks.Task!>! onChange, Wick.Core.EffectOptions? options = null, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> Wick.Core.ReactiveEffect!
+Wick.Blazor.ReactiveComponentCore.Watch<TChange>(Wick.Core.CollectionChanges<TChange>! changes, System.Action<System.Collections.Generic.IReadOnlyList<TChange>!>! onChanges, Wick.Core.EffectOptions? options = null) -> Wick.Core.ReactiveEffect!
+Wick.Blazor.ReactiveLayoutComponentBase
+Wick.Blazor.ReactiveLayoutComponentBase.Body.get -> Microsoft.AspNetCore.Components.RenderFragment?
+Wick.Blazor.ReactiveLayoutComponentBase.Body.set -> void
+Wick.Blazor.ReactiveLayoutComponentBase.ReactiveLayoutComponentBase() -> void
+Wick.Blazor.ReactiveRegion
+Wick.Blazor.ReactiveRegion.ChildContent.get -> Microsoft.AspNetCore.Components.RenderFragment?
+Wick.Blazor.ReactiveRegion.ChildContent.set -> void
+Wick.Blazor.ReactiveRegion.ReactiveRegion() -> void
+Wick.Blazor.ReactiveRendering
+override Wick.Blazor.ReactiveLayoutComponentBase.SetParametersAsync(Microsoft.AspNetCore.Components.ParameterView parameters) -> System.Threading.Tasks.Task!
+override sealed Wick.Blazor.ReactiveComponentCore.BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder! builder) -> void
+static Wick.Blazor.ReactiveRendering.WhenIdleAsync() -> System.Threading.Tasks.Task!
+virtual Wick.Blazor.ReactiveComponentBase.BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder! builder) -> void
+virtual Wick.Blazor.ReactiveComponentCore.Dispose(bool disposing) -> void
+virtual Wick.Blazor.ReactiveComponentCore.DisposeAsyncCore() -> System.Threading.Tasks.ValueTask

@@ -25,6 +25,10 @@ namespace Wick.Core;
 /// </remarks>
 public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
 {
+    /// <summary>
+    /// How many runs in a row an effect may trigger itself, by writing state it read or calling <see cref="Rerun"/>,
+    /// before it is paused and reports an <see cref="InvalidOperationException"/>.
+    /// </summary>
     public const int MaxConsecutiveSelfTriggeredRuns = 100;
 
     private const int Idle = 0;

@@ -16,6 +16,9 @@ public abstract class ReactiveObject : IReactiveState
     private readonly Lock _nodesGate = new();
     private Dictionary<string, ReactiveNode>? _nodes;
 
+    /// <summary>Records the read of <paramref name="property"/> while tracking, then returns <paramref name="field"/>.</summary>
+    /// <param name="field">The property's backing field.</param>
+    /// <param name="property">The property name; supplied by the compiler.</param>
     protected T Get<T>(ref T field, [CallerMemberName] string property = "")
     {
         var observer = ReactiveObserver.Current;
@@ -27,6 +30,15 @@ public abstract class ReactiveObject : IReactiveState
         return field;
     }
 
+    /// <summary>
+    /// Writes <paramref name="value"/> and notifies the readers of <paramref name="property"/> when it differs from the
+    /// current value by <see cref="EqualityComparer{T}.Default"/>.
+    /// </summary>
+    /// <param name="field">The property's backing field.</param>
+    /// <param name="value">The new value.</param>
+    /// <param name="property">The property name; supplied by the compiler.</param>
+    /// <returns>Whether the value changed.</returns>
+    /// <exception cref="InvalidOperationException">Called during a component render or a derived computation.</exception>
     protected bool Set<T>(ref T field, T value, [CallerMemberName] string property = "")
         => !EqualityComparer<T>.Default.Equals(field, value) && Write(ref field, value, property);
 

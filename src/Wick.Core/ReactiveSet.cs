@@ -20,6 +20,8 @@ namespace Wick.Core;
 /// An item that was checked while tracking keeps a small subscription node for the lifetime of the set, even after
 /// the item is removed; avoid tracked checks of unbounded sets of distinct missing items. Such a node is named after its
 /// item (<c>ReactiveSet[tag]</c>) only when created while <see cref="WickDiagnostics.Enabled"/> is set.
+/// Mutations throw <see cref="InvalidOperationException"/> during a component render or a derived computation, like
+/// any reactive write.
 /// </remarks>
 public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
     where T : notnull
@@ -35,17 +37,20 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
     private ReactiveNode? _itemsNode;
     private CollectionChanges<SetChange<T>>? _changes;
 
+    /// <summary>Creates an empty set that compares items with <see cref="EqualityComparer{T}.Default"/>.</summary>
     public ReactiveSet()
         : this(comparer: null)
     {
     }
 
+    /// <summary>Creates an empty set that compares items with <paramref name="comparer"/>, or the default comparer when <see langword="null"/>.</summary>
     public ReactiveSet(IEqualityComparer<T>? comparer)
     {
         _items = new HashSet<T>(comparer);
         _itemNodes = new Dictionary<T, ReactiveNode>(comparer);
     }
 
+    /// <summary>Creates a set holding the distinct <paramref name="items"/>, compared with <paramref name="comparer"/> or the default comparer.</summary>
     public ReactiveSet(IEnumerable<T> items, IEqualityComparer<T>? comparer = null)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -117,20 +122,27 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         }
     }
 
+    /// <summary>Copies the items to <paramref name="array"/> starting at <paramref name="arrayIndex"/>; tracked like enumeration.</summary>
     public void CopyTo(T[] array, int arrayIndex) => Snapshot().CopyTo(array, arrayIndex);
 
+    /// <summary>Whether every item is in <paramref name="other"/>; tracked like enumeration.</summary>
     public bool IsSubsetOf(IEnumerable<T> other) => Compare(other, static (items, others) => items.IsSubsetOf(others));
 
+    /// <summary>Whether every item of <paramref name="other"/> is in the set; tracked like enumeration.</summary>
     public bool IsSupersetOf(IEnumerable<T> other) => Compare(other, static (items, others) => items.IsSupersetOf(others));
 
+    /// <summary>Whether the set is a subset of <paramref name="other"/> and smaller than it; tracked like enumeration.</summary>
     public bool IsProperSubsetOf(IEnumerable<T> other)
         => Compare(other, static (items, others) => items.IsProperSubsetOf(others));
 
+    /// <summary>Whether the set is a superset of <paramref name="other"/> and larger than it; tracked like enumeration.</summary>
     public bool IsProperSupersetOf(IEnumerable<T> other)
         => Compare(other, static (items, others) => items.IsProperSupersetOf(others));
 
+    /// <summary>Whether the set and <paramref name="other"/> share an item; tracked like enumeration.</summary>
     public bool Overlaps(IEnumerable<T> other) => Compare(other, static (items, others) => items.Overlaps(others));
 
+    /// <summary>Whether the set and <paramref name="other"/> hold the same items; tracked like enumeration.</summary>
     public bool SetEquals(IEnumerable<T> other) => Compare(other, static (items, others) => items.SetEquals(others));
 
     /// <summary>Adds <paramref name="item"/> unless present; returns whether it was added.</summary>
@@ -158,6 +170,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
 
     void ICollection<T>.Add(T item) => Add(item);
 
+    /// <summary>Removes <paramref name="item"/>; returns whether it was present.</summary>
     public bool Remove(T item)
     {
         ReactiveObserver.ThrowIfTracking();
@@ -180,6 +193,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         return true;
     }
 
+    /// <summary>Removes every item; an empty set notifies nobody.</summary>
     public void Clear()
     {
         ReactiveObserver.ThrowIfTracking();

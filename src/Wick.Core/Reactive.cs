@@ -3,6 +3,17 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Wick.Core;
 
+/// <summary>
+/// Entry points for working with reactive state; components have owned forms of the effect helpers.
+/// <list type="bullet">
+/// <item><see cref="Effect(Action, EffectOptions?)"/> and <c>Watch</c> run code when state they read changes.</item>
+/// <item><see cref="Derived{T}(Func{T}, IEqualityComparer{T}?)"/> and
+/// <see cref="Debounced{T}(Func{T}, TimeSpan, TimeProvider?)"/> compute values that are tracked like properties.</item>
+/// <item><see cref="Batch"/> and <see cref="BatchAsync"/> deliver several writes as one notification.</item>
+/// <item><see cref="Untracked{T}"/> reads state without depending on it.</item>
+/// <item><see cref="Invalidate{T}"/> notifies the readers of state that changed behind Wick's back.</item>
+/// </list>
+/// </summary>
 public static class Reactive
 {
     /// <summary>

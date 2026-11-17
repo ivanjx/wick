@@ -31,8 +31,10 @@ public sealed class ReactiveEqualityAttribute : Attribute
         ComparerType = comparerType;
     }
 
+    /// <summary>The comparison mode; <see cref="ReactiveEqualityMode.Default"/> when a comparer type was given.</summary>
     public ReactiveEqualityMode Mode { get; }
 
+    /// <summary>The comparer type, or <see langword="null"/> when a <see cref="Mode"/> was given.</summary>
     public Type? ComparerType { get; }
 }
 

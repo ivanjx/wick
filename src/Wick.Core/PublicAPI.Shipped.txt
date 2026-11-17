@@ -1,0 +1,204 @@
+#nullable enable
+Wick.Core.CollectionChangeKind
+Wick.Core.CollectionChangeKind.Added = 0 -> Wick.Core.CollectionChangeKind
+Wick.Core.CollectionChangeKind.Moved = 3 -> Wick.Core.CollectionChangeKind
+Wick.Core.CollectionChangeKind.Removed = 1 -> Wick.Core.CollectionChangeKind
+Wick.Core.CollectionChangeKind.Replaced = 2 -> Wick.Core.CollectionChangeKind
+Wick.Core.CollectionChangeKind.Reset = 4 -> Wick.Core.CollectionChangeKind
+Wick.Core.CollectionChanges<TChange>
+Wick.Core.Debounced<T>
+Wick.Core.Debounced<T>.Dispose() -> void
+Wick.Core.Debounced<T>.Value.get -> T
+Wick.Core.Derived<T>
+Wick.Core.Derived<T>.Dispose() -> void
+Wick.Core.Derived<T>.Value.get -> T
+Wick.Core.DictionaryChange<TKey, TValue>
+Wick.Core.DictionaryChange<TKey, TValue>.DictionaryChange() -> void
+Wick.Core.DictionaryChange<TKey, TValue>.Equals(Wick.Core.DictionaryChange<TKey, TValue> other) -> bool
+Wick.Core.DictionaryChange<TKey, TValue>.Key.get -> TKey
+Wick.Core.DictionaryChange<TKey, TValue>.Kind.get -> Wick.Core.CollectionChangeKind
+Wick.Core.DictionaryChange<TKey, TValue>.OldValue.get -> TValue
+Wick.Core.DictionaryChange<TKey, TValue>.Value.get -> TValue
+Wick.Core.EffectOptions
+Wick.Core.EffectOptions.<Clone>$() -> Wick.Core.EffectOptions!
+Wick.Core.EffectOptions.Debounce.get -> System.TimeSpan
+Wick.Core.EffectOptions.Debounce.init -> void
+Wick.Core.EffectOptions.Dispatcher.get -> System.Func<System.Func<System.Threading.Tasks.Task!>!, System.Threading.Tasks.Task!>?
+Wick.Core.EffectOptions.Dispatcher.init -> void
+Wick.Core.EffectOptions.EffectOptions() -> void
+Wick.Core.EffectOptions.Equals(Wick.Core.EffectOptions? other) -> bool
+Wick.Core.EffectOptions.FlushOnDispose.get -> bool
+Wick.Core.EffectOptions.FlushOnDispose.init -> void
+Wick.Core.EffectOptions.OnError.get -> System.Action<System.Exception!>?
+Wick.Core.EffectOptions.OnError.init -> void
+Wick.Core.EffectOptions.Throttle.get -> System.TimeSpan
+Wick.Core.EffectOptions.Throttle.init -> void
+Wick.Core.EffectOptions.TimeProvider.get -> System.TimeProvider?
+Wick.Core.EffectOptions.TimeProvider.init -> void
+Wick.Core.IReactiveState
+Wick.Core.IReactiveState.FindNode(string! propertyName) -> Wick.Core.ReactiveNode?
+Wick.Core.ListChange<T>
+Wick.Core.ListChange<T>.Equals(Wick.Core.ListChange<T> other) -> bool
+Wick.Core.ListChange<T>.Index.get -> int
+Wick.Core.ListChange<T>.Item.get -> T
+Wick.Core.ListChange<T>.Items.get -> System.Collections.Immutable.ImmutableArray<T>
+Wick.Core.ListChange<T>.Kind.get -> Wick.Core.CollectionChangeKind
+Wick.Core.ListChange<T>.ListChange() -> void
+Wick.Core.ListChange<T>.OldIndex.get -> int
+Wick.Core.ListChange<T>.OldItem.get -> T
+Wick.Core.Reactive
+Wick.Core.ReactiveDictionary<TKey, TValue>
+Wick.Core.ReactiveDictionary<TKey, TValue>.Add(TKey key, TValue value) -> void
+Wick.Core.ReactiveDictionary<TKey, TValue>.Changes.get -> Wick.Core.CollectionChanges<Wick.Core.DictionaryChange<TKey, TValue>>!
+Wick.Core.ReactiveDictionary<TKey, TValue>.Clear() -> void
+Wick.Core.ReactiveDictionary<TKey, TValue>.ContainsKey(TKey key) -> bool
+Wick.Core.ReactiveDictionary<TKey, TValue>.Count.get -> int
+Wick.Core.ReactiveDictionary<TKey, TValue>.GetEnumerator() -> System.Collections.Immutable.ImmutableArray<System.Collections.Generic.KeyValuePair<TKey, TValue>>.Enumerator
+Wick.Core.ReactiveDictionary<TKey, TValue>.Keys.get -> System.Collections.Immutable.ImmutableArray<TKey>
+Wick.Core.ReactiveDictionary<TKey, TValue>.ReactiveDictionary(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>! entries, System.Collections.Generic.IEqualityComparer<TKey>? comparer = null) -> void
+Wick.Core.ReactiveDictionary<TKey, TValue>.ReactiveDictionary(System.Collections.Generic.IEqualityComparer<TKey>? comparer = null) -> void
+Wick.Core.ReactiveDictionary<TKey, TValue>.Remove(TKey key) -> bool
+Wick.Core.ReactiveDictionary<TKey, TValue>.Snapshot() -> System.Collections.Immutable.ImmutableArray<System.Collections.Generic.KeyValuePair<TKey, TValue>>
+Wick.Core.ReactiveDictionary<TKey, TValue>.TryAdd(TKey key, TValue value) -> bool
+Wick.Core.ReactiveDictionary<TKey, TValue>.TryGetValue(TKey key, out TValue value) -> bool
+Wick.Core.ReactiveDictionary<TKey, TValue>.Values.get -> System.Collections.Immutable.ImmutableArray<TValue>
+Wick.Core.ReactiveDictionary<TKey, TValue>.this[TKey key].get -> TValue
+Wick.Core.ReactiveDictionary<TKey, TValue>.this[TKey key].set -> void
+Wick.Core.ReactiveEffect
+Wick.Core.ReactiveEffect.Dispose() -> void
+Wick.Core.ReactiveEffect.FlushAsync() -> System.Threading.Tasks.Task!
+Wick.Core.ReactiveEffect.Rerun() -> void
+Wick.Core.ReactiveEqualityAttribute
+Wick.Core.ReactiveEqualityAttribute.ComparerType.get -> System.Type?
+Wick.Core.ReactiveEqualityAttribute.Mode.get -> Wick.Core.ReactiveEqualityMode
+Wick.Core.ReactiveEqualityAttribute.ReactiveEqualityAttribute(System.Type! comparerType) -> void
+Wick.Core.ReactiveEqualityAttribute.ReactiveEqualityAttribute(Wick.Core.ReactiveEqualityMode mode) -> void
+Wick.Core.ReactiveEqualityMode
+Wick.Core.ReactiveEqualityMode.Default = 0 -> Wick.Core.ReactiveEqualityMode
+Wick.Core.ReactiveEqualityMode.Never = 2 -> Wick.Core.ReactiveEqualityMode
+Wick.Core.ReactiveEqualityMode.Reference = 1 -> Wick.Core.ReactiveEqualityMode
+Wick.Core.ReactiveList<T>
+Wick.Core.ReactiveList<T>.Add(T item) -> void
+Wick.Core.ReactiveList<T>.AddRange(System.Collections.Generic.IEnumerable<T>! items) -> void
+Wick.Core.ReactiveList<T>.Changes.get -> Wick.Core.CollectionChanges<Wick.Core.ListChange<T>>!
+Wick.Core.ReactiveList<T>.Clear() -> void
+Wick.Core.ReactiveList<T>.Contains(T item) -> bool
+Wick.Core.ReactiveList<T>.CopyTo(T[]! array, int arrayIndex) -> void
+Wick.Core.ReactiveList<T>.Count.get -> int
+Wick.Core.ReactiveList<T>.GetEnumerator() -> System.Collections.Immutable.ImmutableArray<T>.Enumerator
+Wick.Core.ReactiveList<T>.IndexOf(T item) -> int
+Wick.Core.ReactiveList<T>.Insert(int index, T item) -> void
+Wick.Core.ReactiveList<T>.Move(int oldIndex, int newIndex) -> void
+Wick.Core.ReactiveList<T>.ReactiveList() -> void
+Wick.Core.ReactiveList<T>.ReactiveList(System.Collections.Generic.IEnumerable<T>! items) -> void
+Wick.Core.ReactiveList<T>.Remove(T item) -> bool
+Wick.Core.ReactiveList<T>.RemoveAll(System.Predicate<T>! match) -> int
+Wick.Core.ReactiveList<T>.RemoveAt(int index) -> void
+Wick.Core.ReactiveList<T>.ReplaceAll(System.Collections.Generic.IEnumerable<T>! items) -> void
+Wick.Core.ReactiveList<T>.Snapshot() -> System.Collections.Immutable.ImmutableArray<T>
+Wick.Core.ReactiveList<T>.this[int index].get -> T
+Wick.Core.ReactiveList<T>.this[int index].set -> void
+Wick.Core.ReactiveNode
+Wick.Core.ReactiveNode.Name.get -> string?
+Wick.Core.ReactiveNode.Notify() -> void
+Wick.Core.ReactiveNode.ReactiveNode() -> void
+Wick.Core.ReactiveNode.ReactiveNode(string? name) -> void
+Wick.Core.ReactiveNode.Track() -> void
+Wick.Core.ReactiveObject
+Wick.Core.ReactiveObject.Get<T>(ref T field, string! property = "") -> T
+Wick.Core.ReactiveObject.ReactiveObject() -> void
+Wick.Core.ReactiveObject.Set<T>(ref T field, T value, System.Collections.Generic.IEqualityComparer<T>! comparer, string! property = "") -> bool
+Wick.Core.ReactiveObject.Set<T>(ref T field, T value, string! property = "") -> bool
+Wick.Core.ReactiveObserver
+Wick.Core.ReactiveObserver.BeginTracking() -> Wick.Core.TrackingScope
+Wick.Core.ReactiveObserver.Dispose() -> void
+Wick.Core.ReactiveObserver.IsDisposed.get -> bool
+Wick.Core.ReactiveObserver.ReactiveObserver() -> void
+Wick.Core.ReactiveProperty
+Wick.Core.ReactiveSet<T>
+Wick.Core.ReactiveSet<T>.Add(T item) -> bool
+Wick.Core.ReactiveSet<T>.Changes.get -> Wick.Core.CollectionChanges<Wick.Core.SetChange<T>>!
+Wick.Core.ReactiveSet<T>.Clear() -> void
+Wick.Core.ReactiveSet<T>.Contains(T item) -> bool
+Wick.Core.ReactiveSet<T>.CopyTo(T[]! array, int arrayIndex) -> void
+Wick.Core.ReactiveSet<T>.Count.get -> int
+Wick.Core.ReactiveSet<T>.ExceptWith(System.Collections.Generic.IEnumerable<T>! other) -> void
+Wick.Core.ReactiveSet<T>.GetEnumerator() -> System.Collections.Immutable.ImmutableArray<T>.Enumerator
+Wick.Core.ReactiveSet<T>.IntersectWith(System.Collections.Generic.IEnumerable<T>! other) -> void
+Wick.Core.ReactiveSet<T>.IsProperSubsetOf(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Wick.Core.ReactiveSet<T>.IsProperSupersetOf(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Wick.Core.ReactiveSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Wick.Core.ReactiveSet<T>.IsSupersetOf(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Wick.Core.ReactiveSet<T>.Overlaps(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Wick.Core.ReactiveSet<T>.ReactiveSet() -> void
+Wick.Core.ReactiveSet<T>.ReactiveSet(System.Collections.Generic.IEnumerable<T>! items, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> void
+Wick.Core.ReactiveSet<T>.ReactiveSet(System.Collections.Generic.IEqualityComparer<T>? comparer) -> void
+Wick.Core.ReactiveSet<T>.Remove(T item) -> bool
+Wick.Core.ReactiveSet<T>.SetEquals(System.Collections.Generic.IEnumerable<T>! other) -> bool
+Wick.Core.ReactiveSet<T>.Snapshot() -> System.Collections.Immutable.ImmutableArray<T>
+Wick.Core.ReactiveSet<T>.SymmetricExceptWith(System.Collections.Generic.IEnumerable<T>! other) -> void
+Wick.Core.ReactiveSet<T>.UnionWith(System.Collections.Generic.IEnumerable<T>! other) -> void
+Wick.Core.ReactiveStateAttribute
+Wick.Core.ReactiveStateAttribute.NotifyPropertyChanged.get -> bool
+Wick.Core.ReactiveStateAttribute.NotifyPropertyChanged.set -> void
+Wick.Core.ReactiveStateAttribute.ReactiveStateAttribute() -> void
+Wick.Core.ReactiveValue<T>
+Wick.Core.ReactiveValue<T>.ReactiveValue(T value, string? name = null, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> void
+Wick.Core.ReactiveValue<T>.Value.get -> T
+Wick.Core.ReactiveValue<T>.Value.set -> void
+Wick.Core.SetChange<T>
+Wick.Core.SetChange<T>.Equals(Wick.Core.SetChange<T> other) -> bool
+Wick.Core.SetChange<T>.Item.get -> T
+Wick.Core.SetChange<T>.Kind.get -> Wick.Core.CollectionChangeKind
+Wick.Core.SetChange<T>.SetChange() -> void
+Wick.Core.TrackingScope
+Wick.Core.TrackingScope.Dispose() -> void
+Wick.Core.TrackingScope.TrackingScope() -> void
+Wick.Core.WickDiagnostics
+abstract Wick.Core.ReactiveObserver.OnInvalidated() -> void
+const Wick.Core.ReactiveEffect.MaxConsecutiveSelfTriggeredRuns = 100 -> int
+override Wick.Core.DictionaryChange<TKey, TValue>.GetHashCode() -> int
+override Wick.Core.EffectOptions.Equals(object? obj) -> bool
+override Wick.Core.EffectOptions.GetHashCode() -> int
+override Wick.Core.EffectOptions.ToString() -> string!
+override Wick.Core.ListChange<T>.GetHashCode() -> int
+override Wick.Core.ReactiveNode.ToString() -> string!
+override Wick.Core.SetChange<T>.GetHashCode() -> int
+static Wick.Core.DictionaryChange<TKey, TValue>.operator !=(Wick.Core.DictionaryChange<TKey, TValue> left, Wick.Core.DictionaryChange<TKey, TValue> right) -> bool
+static Wick.Core.DictionaryChange<TKey, TValue>.operator ==(Wick.Core.DictionaryChange<TKey, TValue> left, Wick.Core.DictionaryChange<TKey, TValue> right) -> bool
+static Wick.Core.EffectOptions.operator !=(Wick.Core.EffectOptions? left, Wick.Core.EffectOptions? right) -> bool
+static Wick.Core.EffectOptions.operator ==(Wick.Core.EffectOptions? left, Wick.Core.EffectOptions? right) -> bool
+static Wick.Core.ListChange<T>.operator !=(Wick.Core.ListChange<T> left, Wick.Core.ListChange<T> right) -> bool
+static Wick.Core.ListChange<T>.operator ==(Wick.Core.ListChange<T> left, Wick.Core.ListChange<T> right) -> bool
+static Wick.Core.Reactive.Batch(System.Action! action) -> void
+static Wick.Core.Reactive.BatchAsync(System.Func<System.Threading.Tasks.Task!>! action) -> System.Threading.Tasks.Task!
+static Wick.Core.Reactive.Debounced<T>(System.Func<T>! read, System.TimeSpan delay, System.TimeProvider? timeProvider = null) -> Wick.Core.Debounced<T>!
+static Wick.Core.Reactive.Derived<T>(System.Func<T>! compute, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> Wick.Core.Derived<T>!
+static Wick.Core.Reactive.Effect(System.Action! effect, Wick.Core.EffectOptions? options = null) -> Wick.Core.ReactiveEffect!
+static Wick.Core.Reactive.Effect(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! effect, Wick.Core.EffectOptions? options = null) -> Wick.Core.ReactiveEffect!
+static Wick.Core.Reactive.Effect(System.Func<System.Threading.Tasks.Task!>! effect, Wick.Core.EffectOptions? options = null) -> Wick.Core.ReactiveEffect!
+static Wick.Core.Reactive.Invalidate<T>(System.Func<T>! read) -> void
+static Wick.Core.Reactive.UnhandledEffectException -> System.Action<System.Exception!>?
+static Wick.Core.Reactive.Untracked<T>(System.Func<T>! read) -> T
+static Wick.Core.Reactive.Watch<T>(System.Func<T>! source, System.Action<T, T>! onChange, Wick.Core.EffectOptions? options = null, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> Wick.Core.ReactiveEffect!
+static Wick.Core.Reactive.Watch<T>(System.Func<T>! source, System.Func<T, T, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! onChange, Wick.Core.EffectOptions? options = null, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> Wick.Core.ReactiveEffect!
+static Wick.Core.Reactive.Watch<T>(System.Func<T>! source, System.Func<T, T, System.Threading.Tasks.Task!>! onChange, Wick.Core.EffectOptions? options = null, System.Collections.Generic.IEqualityComparer<T>? comparer = null) -> Wick.Core.ReactiveEffect!
+static Wick.Core.Reactive.Watch<TChange>(Wick.Core.CollectionChanges<TChange>! changes, System.Action<System.Collections.Generic.IReadOnlyList<TChange>!>! onChanges, Wick.Core.EffectOptions? options = null) -> Wick.Core.ReactiveEffect!
+static Wick.Core.ReactiveObserver.IsTracking.get -> bool
+static Wick.Core.ReactiveProperty.Get<T>(ref T field, ref Wick.Core.ReactiveNode? node, string! name) -> T
+static Wick.Core.ReactiveProperty.Set<T>(ref T field, T value, ref Wick.Core.ReactiveNode? node) -> void
+static Wick.Core.ReactiveProperty.Set<T>(ref T field, T value, ref Wick.Core.ReactiveNode? node, System.Collections.Generic.IEqualityComparer<T>! comparer) -> void
+static Wick.Core.ReactiveProperty.SetAlways<T>(ref T field, T value, ref Wick.Core.ReactiveNode? node) -> void
+static Wick.Core.ReactiveProperty.SetByReference<T>(ref T field, T value, ref Wick.Core.ReactiveNode? node) -> void
+static Wick.Core.SetChange<T>.operator !=(Wick.Core.SetChange<T> left, Wick.Core.SetChange<T> right) -> bool
+static Wick.Core.SetChange<T>.operator ==(Wick.Core.SetChange<T> left, Wick.Core.SetChange<T> right) -> bool
+static Wick.Core.WickDiagnostics.Enabled.get -> bool
+static Wick.Core.WickDiagnostics.Enabled.set -> void
+static Wick.Core.WickDiagnostics.GetDependencies(object! source) -> System.Collections.Generic.IReadOnlyList<string!>!
+static Wick.Core.WickDiagnostics.Message -> System.Action<string!>?
+~override Wick.Core.DictionaryChange<TKey, TValue>.Equals(object obj) -> bool
+~override Wick.Core.DictionaryChange<TKey, TValue>.ToString() -> string
+~override Wick.Core.ListChange<T>.Equals(object obj) -> bool
+~override Wick.Core.ListChange<T>.ToString() -> string
+~override Wick.Core.SetChange<T>.Equals(object obj) -> bool
+~override Wick.Core.SetChange<T>.ToString() -> string

@@ -20,6 +20,8 @@ namespace Wick.Core;
 /// A key that was read while tracking keeps a small subscription node for the lifetime of the dictionary, even after
 /// the key is removed; avoid tracked lookups of unbounded sets of distinct missing keys. Such a node is named after its
 /// key (<c>ReactiveDictionary[AAPL]</c>) only when created while <see cref="WickDiagnostics.Enabled"/> is set.
+/// Mutations throw <see cref="InvalidOperationException"/> during a component render or a derived computation, like
+/// any reactive write.
 /// </remarks>
 public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
     where TKey : notnull
@@ -37,12 +39,15 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     private ReactiveNode? _entriesNode;
     private CollectionChanges<DictionaryChange<TKey, TValue>>? _changes;
 
+    /// <summary>Creates an empty dictionary that compares keys with <paramref name="comparer"/>, or the default comparer when <see langword="null"/>.</summary>
     public ReactiveDictionary(IEqualityComparer<TKey>? comparer = null)
     {
         _entries = new Dictionary<TKey, TValue>(comparer);
         _keyNodes = new Dictionary<TKey, ReactiveNode>(comparer);
     }
 
+    /// <summary>Creates a dictionary holding <paramref name="entries"/>, whose keys are compared with <paramref name="comparer"/> or the default comparer.</summary>
+    /// <exception cref="ArgumentException"><paramref name="entries"/> contains a duplicate key.</exception>
     public ReactiveDictionary(IEnumerable<KeyValuePair<TKey, TValue>> entries, IEqualityComparer<TKey>? comparer = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
@@ -51,6 +56,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         _keyNodes = new Dictionary<TKey, ReactiveNode>(comparer);
     }
 
+    /// <summary>The number of entries; replacing a value does not invalidate its readers.</summary>
     public int Count
     {
         get
@@ -131,6 +137,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
 
     IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)Snapshot()).GetEnumerator();
 
+    /// <summary>Gets the value of <paramref name="key"/> if present; readers depend on that key only.</summary>
     public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value)
     {
         TrackKey(key);
@@ -141,6 +148,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         }
     }
 
+    /// <summary>Whether <paramref name="key"/> is present; readers depend on that key only.</summary>
     public bool ContainsKey(TKey key)
     {
         TrackKey(key);
@@ -157,6 +165,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     void ICollection<KeyValuePair<TKey, TValue>>.CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
         => Snapshot().CopyTo(array, arrayIndex);
 
+    /// <summary>Adds an entry for a key that is not present yet.</summary>
     /// <exception cref="ArgumentException">The key already exists.</exception>
     public void Add(TKey key, TValue value) => Set(key, value, throwIfExists: true);
 
@@ -185,6 +194,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         return true;
     }
 
+    /// <summary>Removes the entry of <paramref name="key"/>; returns whether it was present.</summary>
     public bool Remove(TKey key)
     {
         ReactiveObserver.ThrowIfTracking();
@@ -230,6 +240,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         return true;
     }
 
+    /// <summary>Removes every entry; an empty dictionary notifies nobody.</summary>
     public void Clear()
     {
         ReactiveObserver.ThrowIfTracking();

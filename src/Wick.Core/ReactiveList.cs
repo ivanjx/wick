@@ -17,6 +17,8 @@ namespace Wick.Core;
 /// Each call is atomic on its own; a sequence such as <c>list[list.Count - 1]</c> is not. For a consistent view
 /// across several reads, read <see cref="Snapshot"/> once. Items are not observed: make them reactive themselves
 /// (for example with <see cref="ReactiveStateAttribute"/>) so that editing an item re-renders only its readers.
+/// Mutations throw <see cref="InvalidOperationException"/> during a component render or a derived computation, like
+/// any reactive write.
 /// </remarks>
 public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 {
@@ -31,11 +33,13 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
     private ReactiveNode? _itemsNode;
     private CollectionChanges<ListChange<T>>? _changes;
 
+    /// <summary>Creates an empty list.</summary>
     public ReactiveList()
     {
         _items = [];
     }
 
+    /// <summary>Creates a list holding <paramref name="items"/>.</summary>
     public ReactiveList(IEnumerable<T> items)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -43,6 +47,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         _items = [.. items];
     }
 
+    /// <summary>The number of items; readers are not invalidated by changes that keep it.</summary>
     public int Count
     {
         get
@@ -79,6 +84,10 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         }
     }
 
+    /// <summary>
+    /// Gets the item at <paramref name="index"/>, tracked like enumeration, or replaces it; writing an equal item by
+    /// <see cref="EqualityComparer{T}.Default"/> notifies nobody, and <see cref="Count"/> readers are never invalidated.
+    /// </summary>
     public T this[int index]
     {
         get
@@ -126,6 +135,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
 
     IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)Snapshot()).GetEnumerator();
 
+    /// <summary>Whether the list contains <paramref name="item"/>; tracked like enumeration.</summary>
     public bool Contains(T item)
     {
         ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
@@ -136,6 +146,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         }
     }
 
+    /// <summary>The index of the first occurrence of <paramref name="item"/>, or -1; tracked like enumeration.</summary>
     public int IndexOf(T item)
     {
         ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
@@ -146,6 +157,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         }
     }
 
+    /// <summary>Copies the items to <paramref name="array"/> starting at <paramref name="arrayIndex"/>; tracked like enumeration.</summary>
     public void CopyTo(T[] array, int arrayIndex)
     {
         ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
@@ -156,6 +168,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         }
     }
 
+    /// <summary>Appends <paramref name="item"/>.</summary>
     public void Add(T item)
     {
         ReactiveObserver.ThrowIfTracking();
@@ -170,6 +183,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         NotifyCountAndItems();
     }
 
+    /// <summary>Appends <paramref name="items"/> with a single notification; an empty sequence notifies nobody.</summary>
     public void AddRange(IEnumerable<T> items)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -193,6 +207,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         NotifyCountAndItems();
     }
 
+    /// <summary>Inserts <paramref name="item"/> at <paramref name="index"/>.</summary>
     public void Insert(int index, T item)
     {
         ReactiveObserver.ThrowIfTracking();
@@ -207,6 +222,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         NotifyCountAndItems();
     }
 
+    /// <summary>Removes the first occurrence of <paramref name="item"/>; returns whether it was found.</summary>
     public bool Remove(T item)
     {
         ReactiveObserver.ThrowIfTracking();
@@ -231,6 +247,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         return true;
     }
 
+    /// <summary>Removes the item at <paramref name="index"/>.</summary>
     public void RemoveAt(int index)
     {
         ReactiveObserver.ThrowIfTracking();
@@ -272,6 +289,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         return removed;
     }
 
+    /// <summary>Removes every item; an empty list notifies nobody.</summary>
     public void Clear()
     {
         ReactiveObserver.ThrowIfTracking();

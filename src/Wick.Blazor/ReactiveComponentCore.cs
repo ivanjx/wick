@@ -5,10 +5,15 @@ using Wick.Core;
 namespace Wick.Blazor;
 
 /// <summary>
+/// Shared base of <see cref="ReactiveComponentBase"/> and <see cref="ReactiveLayoutComponentBase"/>: tracks the reactive
+/// state read while rendering and re-renders the component, on its dispatcher, when that state changes. Derive from one
+/// of those two classes; this one cannot be derived from directly.
+/// </summary>
+/// <remarks>
 /// Owns the render-tracking boundary. Razor always emits <c>protected override void BuildRenderTree</c>,
 /// so this class seals <see cref="ComponentBase.BuildRenderTree"/> and <see cref="ReactiveComponentBase"/>
 /// re-declares a new virtual <c>BuildRenderTree</c> for Razor to override. Only public Blazor API is used.
-/// </summary>
+/// </remarks>
 public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsyncDisposable, IReactiveObserverOwner
 {
     private static readonly EffectOptions s_defaultEffectOptions = new();
@@ -19,7 +24,11 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     private volatile bool _disposed;
     private List<IDisposable>? _owned;
 
-    private protected ReactiveComponentCore()
+    // Protected rather than private protected so the public API analyzer tracks the protected members that
+    // ReactiveComponentBase exposes (RS0022). Other assemblies still can't derive from this class: they can't
+    // implement the private protected BuildTrackedRenderTree.
+    /// <summary>Called by the constructors of <see cref="ReactiveComponentBase"/> and <see cref="ReactiveLayoutComponentBase"/>.</summary>
+    protected ReactiveComponentCore()
     {
         _observer = new ComponentObserver(this);
     }
@@ -31,6 +40,7 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
 
     ReactiveObserver IReactiveObserverOwner.Observer => _observer;
 
+    /// <summary>Renders the component while tracking the reactive state it reads; override the re-declared <c>BuildRenderTree</c> instead.</summary>
     protected sealed override void BuildRenderTree(RenderTreeBuilder builder)
     {
         // Clear before reading state: a write racing with this render either is observed by it or
@@ -247,6 +257,10 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         }
     }
 
+    /// <summary>
+    /// Runs <see cref="Dispose(bool)"/>, whose base implementation releases the component's reactive subscriptions and the
+    /// effects, watches and debounced values it owns. Blazor calls <see cref="DisposeAsync"/> instead.
+    /// </summary>
     public void Dispose()
     {
         Dispose(disposing: true);
@@ -291,10 +305,10 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     protected virtual ValueTask DisposeAsyncCore() => ValueTask.CompletedTask;
 
     /// <summary>
-    /// Override to release resources; always call the base implementation. Components that
-    /// re-implement <see cref="IDisposable"/> or <see cref="IAsyncDisposable"/> (for example via
-    /// <c>@implements IDisposable</c>) bypass this method; analyzer WK0007 reports that, and their
-    /// subscriptions are only released once the component is garbage collected.
+    /// Override to release resources; always call the base implementation. A component that declares its own
+    /// <c>Dispose</c> or <c>DisposeAsync</c> (for example via <c>@implements IDisposable</c>) replaces or hides the base
+    /// disposal: Blazor then either never calls that declaration or calls it instead of the cleanup that releases reactive
+    /// subscriptions, and the state the component read keeps it alive. Analyzer WK0007 reports that.
     /// </summary>
     protected virtual void Dispose(bool disposing)
     {

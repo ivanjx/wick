@@ -9,6 +9,11 @@
     <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.10" />
   </ItemGroup>
 
+  <!-- Locks the public API: a change that isn't recorded in PublicAPI.*.txt fails the build (RS0016/RS0017). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- PrivateAssets="none": by default the package dependency excludes analyzers, which would hide the generator Wick.Core carries. -->
     <ProjectReference Include="..\Wick.Core\Wick.Core.csproj" PrivateAssets="none" />
