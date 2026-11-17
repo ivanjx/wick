@@ -3,8 +3,8 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <PropertyGroup>
-    <Version>0.1.0</Version>
-    <Authors>Ivan Kara</Authors>
+    <Version>1.0.0</Version>
+    <Authors>ivanjx</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ivanjx/wick</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ivanjx/wick</RepositoryUrl>
