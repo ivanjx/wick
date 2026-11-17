@@ -87,31 +87,13 @@ The traditional version gets slower as the grid grows; Wick's cost stays flat, b
 
 **Requirements:** .NET 10 and C# 14 (the default for `net10.0`).
 
-Add Wick to your repository as a git submodule:
+Install the Blazor package into your app:
 
 ```sh
-git submodule add https://github.com/ivanjx/wick.git third_party/wick
-dotnet sln add \
-  third_party/wick/src/Wick.Core/Wick.Core.csproj \
-  third_party/wick/src/Wick.Blazor/Wick.Blazor.csproj \
-  third_party/wick/src/Wick.Generators/Wick.Generators.csproj \
-  third_party/wick/src/Wick.CodeFixes/Wick.CodeFixes.csproj
+dotnet add package Wick.Blazor
 ```
 
-Then reference the projects from your Blazor app:
-
-```xml
-<ItemGroup>
-  <ProjectReference Include="..\third_party\wick\src\Wick.Blazor\Wick.Blazor.csproj" />
-  <ProjectReference Include="..\third_party\wick\src\Wick.Generators\Wick.Generators.csproj"
-                    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-  <!-- Optional: IDE quick fixes for Wick's warnings. -->
-  <ProjectReference Include="..\third_party\wick\src\Wick.CodeFixes\Wick.CodeFixes.csproj"
-                    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-</ItemGroup>
-```
-
-Paths are relative to your app's `.csproj`; adjust them to where it lives. Anyone cloning your repository needs `git clone --recurse-submodules`, or `git submodule update --init` after a plain clone. To move to a newer Wick, run `git submodule update --remote third_party/wick` and commit the change.
+It brings in `Wick.Core`, which carries the `[ReactiveState]` source generator and the IDE quick fixes for Wick's warnings. Outside Blazor (a console app, a worker, WinForms), install `Wick.Core` on its own.
 
 **1. Make components reactive.** Add this to `_Imports.razor` so every component inherits it:
 
