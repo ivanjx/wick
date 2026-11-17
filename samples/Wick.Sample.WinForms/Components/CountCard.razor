@@ -6,10 +6,10 @@
     <div class="row">
         <button id="increment" @onclick="State.Increment">Increment</button>
         <button id="toggle" class="secondary" @onclick="() => State.Ticking = !State.Ticking">
-            @(State.Ticking ? "Pause loop" : "Resume loop")
+            @(State.Ticking ? "Pause timer" : "Resume timer")
         </button>
     </div>
-    <p class="hint">A <code>Task.Run</code> loop adds 1 every second; the native Increment button writes the same property.</p>
+    <p class="hint">A thread-pool <code>System.Threading.Timer</code> adds 1 every second; the native Increment button writes the same property.</p>
 </div>
 
 @code {

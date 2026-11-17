@@ -13,7 +13,7 @@ namespace Wick.Sample.WinForms;
 public sealed class MainForm : Form
 {
     private readonly CounterState _state;
-    private readonly CancellationTokenSource _stop = new();
+    private readonly System.Threading.Timer _ticker;
     private readonly List<ReactiveEffect> _effects = [];
 
     private readonly Label _count = BigLabel("native-count");
@@ -25,6 +25,7 @@ public sealed class MainForm : Form
     public MainForm(IServiceProvider services)
     {
         _state = services.GetRequiredService<CounterState>();
+        _ticker = new System.Threading.Timer(Tick);
 
         Text = "Wick on WinForms";
         ClientSize = new Size(1280, 800);
@@ -76,15 +77,15 @@ public sealed class MainForm : Form
         base.OnLoad(e);
 
         _effects.Add(Bind(() => _state.Count, count => _count.Text = count.ToString(), _countUpdates));
-        _effects.Add(Bind(() => _state.Ticking, ticking => _toggle.Text = ticking ? "Pause loop" : "Resume loop"));
+        _effects.Add(Bind(() => _state.Ticking, ticking => _toggle.Text = ticking ? "Pause timer" : "Resume timer"));
         _effects.Add(Bind(() => (_state.Left, _state.Right), pair => _batch.Text = $"{pair.Left} / {pair.Right}", _batchUpdates));
 
-        _ = Task.Run(TickAsync);
+        _ticker.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        _stop.Cancel();
+        _ticker.Dispose();
         foreach (var effect in _effects)
         {
             effect.Dispose();
@@ -109,16 +110,12 @@ public sealed class MainForm : Form
         });
     }
 
-    // Writes from a thread-pool loop: the Blazor cards and the effects above pick them up without marshalling here.
-    private async Task TickAsync()
+    // Writes from thread-pool timer callbacks: the Blazor cards and the effects above pick them up without marshalling here.
+    private void Tick(object? _)
     {
-        while (!_stop.IsCancellationRequested)
+        if (_state.Ticking)
         {
-            await Task.Delay(1000);
-            if (_state.Ticking)
-            {
-                _state.Increment();
-            }
+            _state.Increment();
         }
     }
 

@@ -9,12 +9,12 @@
             <li>@entry</li>
         }
     </ul>
-    <p class="hint">A component-owned <code>Effect</code> reads <code>Count</code> and <code>Left</code> and appends to a capped <code>ReactiveList</code>.</p>
+    <p class="hint">A component-owned <code>Effect</code> reads <code>Count</code> and <code>Left</code> and appends to a capped <code>ReactiveList</code>. Writes come from the timer's thread-pool threads or the UI thread.</p>
 </div>
 
 @code {
     private int _renders;
 
     protected override void OnInitialized() =>
-        Effect(() => Log.Add($"count={State.Count} left={State.Left} (thread {Environment.CurrentManagedThreadId})"));
+        Effect(() => Log.Add($"count={State.Count} left={State.Left} (set on thread {State.WriterThread})"));
 }
