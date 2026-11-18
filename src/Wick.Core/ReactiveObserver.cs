@@ -24,6 +24,11 @@ public abstract class ReactiveObserver : IDisposable
     [ThreadStatic]
     private static ReactiveObserver? t_untracked;
 
+    // Scratch list for the nodes to unsubscribe once the lock is released. Unsubscribing calls no other code, so
+    // nothing can re-enter it on this thread while it is in use.
+    [ThreadStatic]
+    private static List<ReactiveNode>? t_unsubscribing;
+
     private readonly Lock _gate = new();
     private HashSet<ReactiveNode> _dependencies = [];
     private HashSet<ReactiveNode> _collecting = [];
@@ -127,7 +132,7 @@ public abstract class ReactiveObserver : IDisposable
             {
                 if (!_collecting.Contains(node))
                 {
-                    (stale ??= []).Add(node);
+                    (stale ??= t_unsubscribing ??= []).Add(node);
                 }
             }
 
@@ -140,9 +145,22 @@ public abstract class ReactiveObserver : IDisposable
             return;
         }
 
-        foreach (var node in stale)
+        UnsubscribeAll(stale);
+    }
+
+    /// <summary>Unsubscribes from every node of <paramref name="nodes"/>, the thread's scratch list, and empties it.</summary>
+    private void UnsubscribeAll(List<ReactiveNode> nodes)
+    {
+        try
         {
-            node.Unsubscribe(this);
+            foreach (var node in nodes)
+            {
+                node.Unsubscribe(this);
+            }
+        }
+        finally
+        {
+            nodes.Clear();
         }
     }
 
@@ -264,7 +282,7 @@ public abstract class ReactiveObserver : IDisposable
     /// <summary>Releases every subscription held by this observer.</summary>
     public void Dispose()
     {
-        ReactiveNode[] dependencies;
+        List<ReactiveNode> dependencies;
         lock (_gate)
         {
             if (_disposed)
@@ -273,15 +291,14 @@ public abstract class ReactiveObserver : IDisposable
             }
 
             _disposed = true;
-            dependencies = [.. _dependencies, .. _collecting];
+            dependencies = t_unsubscribing ??= [];
+            dependencies.AddRange(_dependencies);
+            dependencies.AddRange(_collecting);
             _dependencies.Clear();
             _collecting.Clear();
         }
 
-        foreach (var node in dependencies)
-        {
-            node.Unsubscribe(this);
-        }
+        UnsubscribeAll(dependencies);
 
         GC.SuppressFinalize(this);
     }

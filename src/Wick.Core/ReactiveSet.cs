@@ -226,7 +226,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         ArgumentNullException.ThrowIfNull(other);
         ReactiveObserver.ThrowIfTracking();
 
-        var others = other.ToArray();
+        var others = ReadableUnderLock(other);
         List<ReactiveNode> changedNodes = [];
         var changed = false;
         lock (_gate)
@@ -259,7 +259,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         ArgumentNullException.ThrowIfNull(other);
         ReactiveObserver.ThrowIfTracking();
 
-        var others = other.ToArray();
+        var others = ReadableUnderLock(other);
         List<ReactiveNode> changedNodes = [];
         var changed = false;
         lock (_gate)
@@ -292,23 +292,29 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         ArgumentNullException.ThrowIfNull(other);
         ReactiveObserver.ThrowIfTracking();
 
-        var others = other.ToArray();
+        // Built outside the lock, like the copies made by the other bulk operations; a set with the same comparer
+        // already answers the lookups.
+        var kept = other is HashSet<T> set && set.Comparer.Equals(_items.Comparer) ? set : new HashSet<T>(other, _items.Comparer);
         List<ReactiveNode> changedNodes = [];
         lock (_gate)
         {
-            var kept = new HashSet<T>(others, _items.Comparer);
-            var removed = _items.Where(item => !kept.Contains(item)).ToArray();
-            if (removed.Length == 0)
-            {
-                return;
-            }
-
             var changes = WatchedChanges;
-            foreach (var item in removed)
+            var removed = _items.RemoveWhere(item =>
             {
-                _items.Remove(item);
+                if (kept.Contains(item))
+                {
+                    return false;
+                }
+
                 CollectNode(item, changedNodes);
                 changes?.Record(SetChange<T>.Removed(item));
+
+                return true;
+            });
+
+            if (removed == 0)
+            {
+                return;
             }
 
             _snapshot = null;
@@ -356,12 +362,12 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
         NotifyChange(changedNodes);
     }
 
-    private bool Compare(IEnumerable<T> other, Func<HashSet<T>, T[], bool> compare)
+    private bool Compare(IEnumerable<T> other, Func<HashSet<T>, IEnumerable<T>, bool> compare)
     {
         ArgumentNullException.ThrowIfNull(other);
 
         // Materialized outside the lock: enumerating another reactive set takes its own gate.
-        var others = other.ToArray();
+        IEnumerable<T> others = other is T[] or List<T> or HashSet<T> ? other : other.ToArray();
 
         ReactiveProperty.Track(ref _itemsNode, ItemsNodeName);
 
@@ -370,6 +376,18 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
             return compare(_items, others);
         }
     }
+
+    /// <summary>
+    /// The items of <paramref name="other"/>, safe to read under the lock: arrays and lists in place, any other
+    /// sequence copied first, since enumerating it (another reactive set, a lazy query) may take locks or read
+    /// reactive state.
+    /// </summary>
+    private static ReadOnlySpan<T> ReadableUnderLock(IEnumerable<T> other) => other switch
+    {
+        T[] array => array,
+        List<T> list => CollectionsMarshal.AsSpan(list),
+        _ => other.ToArray(),
+    };
 
     private void CollectNode(T item, List<ReactiveNode> changedNodes)
     {

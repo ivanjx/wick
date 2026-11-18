@@ -216,7 +216,9 @@ public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
     private protected void Schedule()
     {
         PendingWork.Add();
-        ThreadPool.UnsafeQueueUserWorkItem(static effect => effect.Dispatch(), this, preferLocal: false);
+
+        // The observer doubles as the work item, so scheduling a run allocates nothing.
+        ThreadPool.UnsafeQueueUserWorkItem(_observer, preferLocal: false);
     }
 
     /// <summary>Marks a run that found the effect disposed as finished.</summary>
@@ -572,13 +574,16 @@ public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
         }
     }
 
-    private sealed class EffectObserver(ReactiveEffect owner) : ReactiveObserver
+    /// <summary>The effect's dependencies, and the thread-pool work item that dispatches a scheduled run.</summary>
+    private sealed class EffectObserver(ReactiveEffect owner) : ReactiveObserver, IThreadPoolWorkItem
     {
         internal bool Disposed => IsDisposed;
 
         internal override bool AllowsMutation => true;
 
         protected override void OnInvalidated() => owner.OnInvalidated();
+
+        void IThreadPoolWorkItem.Execute() => owner.Dispatch();
     }
 }
 

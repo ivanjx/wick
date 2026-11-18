@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
@@ -25,6 +26,9 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
     private const string CountNodeName = "ReactiveList<T>.Count";
     private const string ItemsNodeName = "ReactiveList<T>";
     private const string ChangesNodeName = "ReactiveList<T>.Changes";
+
+    // RemoveAll keeps one flag per item on the stack up to this many items, in a pooled array beyond.
+    private const int MaxStackallocMatches = 256;
 
     private readonly Lock _gate = new();
     private readonly List<T> _items;
@@ -400,38 +404,54 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
     /// </summary>
     private int RemoveAll(Predicate<T> match, CollectionChanges<ListChange<T>> changes)
     {
-        var matches = new bool[_items.Count];
-        var removed = 0;
-        for (var i = 0; i < matches.Length; i++)
-        {
-            if (match(_items[i]))
-            {
-                matches[i] = true;
-                removed++;
-            }
-        }
+        var count = _items.Count;
+        bool[]? rented = null;
+        var matches = count <= MaxStackallocMatches
+            ? stackalloc bool[count]
+            : (rented = ArrayPool<bool>.Shared.Rent(count)).AsSpan(0, count);
 
-        if (removed == 0)
+        try
         {
-            return 0;
-        }
-
-        var kept = 0;
-        for (var i = 0; i < matches.Length; i++)
-        {
-            var item = _items[i];
-            if (matches[i])
+            // Every flag is written, so a rented buffer needs no clearing.
+            var removed = 0;
+            for (var i = 0; i < count; i++)
             {
-                changes.Record(ListChange<T>.Removed(item, kept));
-                continue;
+                matches[i] = match(_items[i]);
+                if (matches[i])
+                {
+                    removed++;
+                }
             }
 
-            _items[kept++] = item;
+            if (removed == 0)
+            {
+                return 0;
+            }
+
+            var kept = 0;
+            for (var i = 0; i < count; i++)
+            {
+                var item = _items[i];
+                if (matches[i])
+                {
+                    changes.Record(ListChange<T>.Removed(item, kept));
+                    continue;
+                }
+
+                _items[kept++] = item;
+            }
+
+            _items.RemoveRange(kept, _items.Count - kept);
+
+            return removed;
         }
-
-        _items.RemoveRange(kept, _items.Count - kept);
-
-        return removed;
+        finally
+        {
+            if (rented is not null)
+            {
+                ArrayPool<bool>.Shared.Return(rented);
+            }
+        }
     }
 
     private void NotifyItems()

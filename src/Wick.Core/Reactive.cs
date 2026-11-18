@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
@@ -371,6 +372,10 @@ internal static class ReactiveBatch
     [ThreadStatic]
     private static BatchCommit? t_commit;
 
+    // Reused by Release; taken off the thread while in use, since invalidating observers may release another batch.
+    [ThreadStatic]
+    private static HashSet<ReactiveObserver>? t_releasing;
+
     private static readonly AsyncLocal<AsyncBatch?> s_asyncBatch = new();
 
     // Lets every notification skip the AsyncLocal lookup while no asynchronous batch exists anywhere.
@@ -444,10 +449,18 @@ internal static class ReactiveBatch
             return;
         }
 
-        ReactiveNode[] nodes = [.. pending];
-        pending.Clear();
+        // Detached while released: a notification raised by an observer may open and end another batch on this thread.
+        t_pending = null;
 
-        Release(nodes);
+        try
+        {
+            Release(pending);
+        }
+        finally
+        {
+            pending.Clear();
+            t_pending ??= pending;
+        }
     }
 
     internal static async Task RunAsync(Func<Task> action)
@@ -476,20 +489,46 @@ internal static class ReactiveBatch
         }
     }
 
-    private static void Release(ReactiveNode[] nodes)
+    private static void Release(HashSet<ReactiveNode> nodes)
     {
-        if (nodes.Length == 0)
+        if (nodes.Count == 0)
         {
             return;
         }
 
-        var observers = new HashSet<ReactiveObserver>();
-        foreach (var node in nodes)
-        {
-            node.CollectObservers(observers);
-        }
+        var observers = t_releasing ?? [];
+        t_releasing = null;
 
-        ReactiveObserver.InvalidateAll([.. observers]);
+        ReactiveObserver[]? rented = null;
+        try
+        {
+            foreach (var node in nodes)
+            {
+                node.CollectObservers(observers);
+            }
+
+            var count = observers.Count;
+            if (count == 0)
+            {
+                return;
+            }
+
+            rented = ArrayPool<ReactiveObserver>.Shared.Rent(count);
+            observers.CopyTo(rented);
+
+            ReactiveObserver.InvalidateAll(rented.AsSpan(0, count));
+        }
+        finally
+        {
+            // Cleared so the pool keeps no observer alive.
+            if (rented is not null)
+            {
+                ArrayPool<ReactiveObserver>.Shared.Return(rented, clearArray: true);
+            }
+
+            observers.Clear();
+            t_releasing = observers;
+        }
     }
 
     /// <summary>
@@ -545,16 +584,15 @@ internal static class ReactiveBatch
             }
         }
 
-        public ReactiveNode[] Complete()
+        /// <summary>Ends the batch; the returned set is no longer written to.</summary>
+        public HashSet<ReactiveNode> Complete()
         {
             lock (_gate)
             {
                 _completed = true;
                 _commit?.Commit();
-                ReactiveNode[] nodes = [.. _pending];
-                _pending.Clear();
 
-                return nodes;
+                return _pending;
             }
         }
     }

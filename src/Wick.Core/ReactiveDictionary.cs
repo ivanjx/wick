@@ -73,10 +73,10 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     bool ICollection<KeyValuePair<TKey, TValue>>.IsReadOnly => false;
 
     /// <summary>The keys of a snapshot; tracked like enumeration.</summary>
-    public ImmutableArray<TKey> Keys => [.. Snapshot().Select(static entry => entry.Key)];
+    public ImmutableArray<TKey> Keys => ImmutableArray.CreateRange(Snapshot(), static entry => entry.Key);
 
     /// <summary>The values of a snapshot; tracked like enumeration.</summary>
-    public ImmutableArray<TValue> Values => [.. Snapshot().Select(static entry => entry.Value)];
+    public ImmutableArray<TValue> Values => ImmutableArray.CreateRange(Snapshot(), static entry => entry.Value);
 
     ICollection<TKey> IDictionary<TKey, TValue>.Keys => Keys;
 

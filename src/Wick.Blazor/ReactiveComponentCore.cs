@@ -23,6 +23,7 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
     private int _pendingFlushes;
     private volatile bool _disposed;
     private List<IDisposable>? _owned;
+    private FlushWorkItem? _flushWorkItem;
 
     // Protected rather than private protected so the public API analyzer tracks the protected members that
     // ReactiveComponentBase exposes (RS0022). Other assemblies still can't derive from this class: they can't
@@ -220,11 +221,11 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         // the producer pay for rendering. Hop to the thread pool first so consecutive mutations coalesce.
         Interlocked.Increment(ref _pendingFlushes);
         PendingWork.Add();
-        ThreadPool.UnsafeQueueUserWorkItem(static component => component.ScheduleFlush(), this, preferLocal: false);
-    }
 
-    // InvokeAsync(Action) reports failures through the returned task; Flush handles its own exceptions.
-    private void ScheduleFlush() => _ = InvokeAsync(Flush);
+        // The work item is created on the first re-render, then reused: a component Wick never re-renders pays
+        // nothing. Two threads racing here may both create one; either is valid.
+        ThreadPool.UnsafeQueueUserWorkItem(_flushWorkItem ??= new FlushWorkItem(this), preferLocal: false);
+    }
 
     private void Flush()
     {
@@ -353,6 +354,25 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         {
             Dispose();
         }
+    }
+
+    /// <summary>
+    /// Hands the component's flush to its dispatcher from the thread pool. Stateless apart from the cached delegate, so
+    /// one instance serves every flush, even when a render in between lets a second flush be queued before the first ran.
+    /// </summary>
+    private sealed class FlushWorkItem : IThreadPoolWorkItem
+    {
+        private readonly ReactiveComponentCore _component;
+        private readonly Action _flush;
+
+        public FlushWorkItem(ReactiveComponentCore component)
+        {
+            _component = component;
+            _flush = component.Flush;
+        }
+
+        // InvokeAsync(Action) reports failures through the returned task; Flush handles its own exceptions.
+        public void Execute() => _ = _component.InvokeAsync(_flush);
     }
 
     /// <summary>

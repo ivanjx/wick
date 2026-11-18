@@ -10,6 +10,9 @@ public sealed class ReactiveNode
     private readonly Lock _gate = new();
     private readonly HashSet<ReactiveObserver> _observers = [];
 
+    // A copy of _observers handed to notifications; never modified once published, rebuilt after the set changed.
+    private ReactiveObserver[]? _snapshot;
+
     /// <summary>Creates an unnamed node.</summary>
     public ReactiveNode()
     {
@@ -65,7 +68,7 @@ public sealed class ReactiveNode
                 return;
             }
 
-            snapshot = [.. _observers];
+            snapshot = _snapshot ??= [.. _observers];
         }
 
         if (WickDiagnostics.Enabled)
@@ -83,17 +86,23 @@ public sealed class ReactiveNode
     {
         lock (_gate)
         {
-            target.UnionWith(_observers);
-
             // Batched notifications are delivered through here, so a deferred change is attributed like a direct one.
-            if (WickDiagnostics.Enabled)
+            var recordCause = WickDiagnostics.Enabled;
+
+            // A plain loop: UnionWith takes an IEnumerable and would box the set's enumerator.
+            foreach (var observer in _observers)
             {
-                RecordAsCause(_observers);
+                target.Add(observer);
+
+                if (recordCause)
+                {
+                    observer.RecordCause(this);
+                }
             }
         }
     }
 
-    private void RecordAsCause(IEnumerable<ReactiveObserver> observers)
+    private void RecordAsCause(ReadOnlySpan<ReactiveObserver> observers)
     {
         foreach (var observer in observers)
         {
@@ -105,7 +114,10 @@ public sealed class ReactiveNode
     {
         lock (_gate)
         {
-            _observers.Add(observer);
+            if (_observers.Add(observer))
+            {
+                _snapshot = null;
+            }
         }
     }
 
@@ -113,7 +125,10 @@ public sealed class ReactiveNode
     {
         lock (_gate)
         {
-            _observers.Remove(observer);
+            if (_observers.Remove(observer))
+            {
+                _snapshot = null;
+            }
         }
     }
 }
