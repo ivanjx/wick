@@ -33,6 +33,7 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
     private readonly Lock _gate = new();
     private readonly HashSet<T> _items;
     private readonly Dictionary<T, ReactiveNode> _itemNodes;
+    private int _itemNodesSweepAt;
     private T[]? _snapshot;
     private ReactiveNode? _itemsNode;
     private CollectionChanges<SetChange<T>>? _changes;
@@ -405,16 +406,18 @@ public sealed class ReactiveSet<T> : ISet<T>, IReadOnlySet<T>
             return;
         }
 
-        // Created and looked up under the lock that guards the items: a writer either runs before this
-        // lookup (and the read that follows the subscription sees its membership) or finds the node and notifies it.
-        ReactiveNode node;
+        // Created, looked up and subscribed to under the lock that guards the items: a writer either runs before this
+        // lookup (and the read that follows the subscription sees its membership) or finds the node and notifies it,
+        // and no sweep drops the node before its reader subscribed.
         lock (_gate)
         {
-            ref var slot = ref CollectionsMarshal.GetValueRefOrAddDefault(_itemNodes, item, out _);
-            node = slot ??= new ReactiveNode(WickDiagnostics.Enabled ? $"ReactiveSet[{item}]" : ItemNodeName);
-        }
+            ReactiveNode.SweepUnobserved(_itemNodes, ref _itemNodesSweepAt);
 
-        observer.RecordDependency(node);
+            ref var slot = ref CollectionsMarshal.GetValueRefOrAddDefault(_itemNodes, item, out _);
+            var node = slot ??= new ReactiveNode(WickDiagnostics.Enabled ? $"ReactiveSet[{item}]" : ItemNodeName);
+
+            observer.RecordDependency(node);
+        }
     }
 
     private T[] CreateSnapshot()

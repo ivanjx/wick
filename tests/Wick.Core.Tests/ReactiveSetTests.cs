@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Wick.Core.Tests;
 
 public sealed class ReactiveSetTests
@@ -185,5 +187,49 @@ public sealed class ReactiveSetTests
 
         Assert.Equal(4 * 1_000, set.Count);
         Assert.True(observer.Invalidations > 0);
+    }
+
+    [Fact]
+    public void Items_no_longer_read_are_released_while_items_still_read_keep_notifying()
+    {
+        var set = new ReactiveSet<object>();
+        var kept = new object();
+        var keptReader = new CountingObserver();
+        var reader = new CountingObserver();
+
+        keptReader.Track(() => set.Contains(kept));
+        var removed = AddReadAndRemove(set, reader);
+
+        // The reader moves on to many other items, which lets the set drop the nodes nobody reads any more.
+        for (var i = 0; i < 1_000; i++)
+        {
+            reader.Track(() => set.Contains(i));
+        }
+
+        CollectGarbage();
+
+        Assert.False(removed.IsAlive);
+
+        set.Add(kept);
+
+        Assert.Equal(1, keptReader.Invalidations);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference AddReadAndRemove(ReactiveSet<object> set, CountingObserver reader)
+    {
+        var item = new object();
+        set.Add(item);
+        reader.Track(() => set.Contains(item));
+        set.Remove(item);
+
+        return new WeakReference(item);
+    }
+
+    private static void CollectGarbage()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 }

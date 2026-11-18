@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Wick.Core.Tests;
 
 public sealed class ReactiveDictionaryTests
@@ -122,5 +124,49 @@ public sealed class ReactiveDictionaryTests
 
         Assert.Equal(4 * 1_000, map.Count);
         Assert.True(observer.Invalidations > 0);
+    }
+
+    [Fact]
+    public void Keys_no_longer_read_are_released_while_keys_still_read_keep_notifying()
+    {
+        var map = new ReactiveDictionary<object, int>();
+        var kept = new object();
+        var keptReader = new CountingObserver();
+        var reader = new CountingObserver();
+
+        keptReader.Track(() => map.ContainsKey(kept));
+        var removed = AddReadAndRemove(map, reader);
+
+        // The reader moves on to many other keys, which lets the dictionary drop the nodes nobody reads any more.
+        for (var i = 0; i < 1_000; i++)
+        {
+            reader.Track(() => map.ContainsKey(i));
+        }
+
+        CollectGarbage();
+
+        Assert.False(removed.IsAlive);
+
+        map[kept] = 1;
+
+        Assert.Equal(1, keptReader.Invalidations);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference AddReadAndRemove(ReactiveDictionary<object, int> map, CountingObserver reader)
+    {
+        var key = new object();
+        map[key] = 1;
+        reader.Track(() => map.TryGetValue(key, out _));
+        map.Remove(key);
+
+        return new WeakReference(key);
+    }
+
+    private static void CollectGarbage()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 }

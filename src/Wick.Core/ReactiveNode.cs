@@ -7,6 +7,9 @@ namespace Wick.Core;
 /// </summary>
 public sealed class ReactiveNode
 {
+    // Smallest per-item node table that is swept, see SweepUnobserved.
+    private const int MinSweepAt = 64;
+
     private readonly Lock _gate = new();
     private readonly HashSet<ReactiveObserver> _observers = [];
 
@@ -130,5 +133,32 @@ public sealed class ReactiveNode
                 _snapshot = null;
             }
         }
+    }
+
+    /// <summary>
+    /// Drops the nodes nobody observes from a collection's per-item table once it has doubled since the last sweep,
+    /// so items read once, or removed since, are not kept alive and the table stays proportional to what is read.
+    /// </summary>
+    /// <remarks>
+    /// Call under the collection's lock, which must also cover the subscription of every node it hands out: otherwise
+    /// a sweep could drop a node before its reader subscribed, and later writes would notify a new node instead.
+    /// </remarks>
+    internal static void SweepUnobserved<TKey>(Dictionary<TKey, ReactiveNode> nodes, ref int sweepAt)
+        where TKey : notnull
+    {
+        if (nodes.Count < sweepAt)
+        {
+            return;
+        }
+
+        foreach (var (key, node) in nodes)
+        {
+            if (node.ObserverCount == 0)
+            {
+                nodes.Remove(key);
+            }
+        }
+
+        sweepAt = Math.Max(MinSweepAt, nodes.Count * 2);
     }
 }

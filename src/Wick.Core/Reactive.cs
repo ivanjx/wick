@@ -485,7 +485,17 @@ internal static class ReactiveBatch
             s_asyncBatch.Value = null;
             Interlocked.Decrement(ref s_activeAsyncBatches);
 
-            Release(batch.Complete());
+            // Emptied once released: work started inside the batch may outlive it and keep it reachable through its
+            // execution context, which must not keep the nodes, and through them their observers, alive.
+            var pending = batch.Complete();
+            try
+            {
+                Release(pending);
+            }
+            finally
+            {
+                pending.Clear();
+            }
         }
     }
 

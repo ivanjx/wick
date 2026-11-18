@@ -34,6 +34,7 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
     private readonly Lock _gate = new();
     private readonly Dictionary<TKey, TValue> _entries;
     private readonly Dictionary<TKey, ReactiveNode> _keyNodes;
+    private int _keyNodesSweepAt;
     private KeyValuePair<TKey, TValue>[]? _snapshot;
     private ReactiveNode? _countNode;
     private ReactiveNode? _entriesNode;
@@ -333,16 +334,18 @@ public sealed class ReactiveDictionary<TKey, TValue> : IDictionary<TKey, TValue>
             return;
         }
 
-        // Created and looked up under the lock that guards the entries: a writer either runs before this
-        // lookup (and the read that follows the subscription sees its value) or finds the node and notifies it.
-        ReactiveNode node;
+        // Created, looked up and subscribed to under the lock that guards the entries: a writer either runs before this
+        // lookup (and the read that follows the subscription sees its value) or finds the node and notifies it, and no
+        // sweep drops the node before its reader subscribed.
         lock (_gate)
         {
-            ref var slot = ref CollectionsMarshal.GetValueRefOrAddDefault(_keyNodes, key, out _);
-            node = slot ??= new ReactiveNode(WickDiagnostics.Enabled ? $"ReactiveDictionary[{key}]" : KeyNodeName);
-        }
+            ReactiveNode.SweepUnobserved(_keyNodes, ref _keyNodesSweepAt);
 
-        observer.RecordDependency(node);
+            ref var slot = ref CollectionsMarshal.GetValueRefOrAddDefault(_keyNodes, key, out _);
+            var node = slot ??= new ReactiveNode(WickDiagnostics.Enabled ? $"ReactiveDictionary[{key}]" : KeyNodeName);
+
+            observer.RecordDependency(node);
+        }
     }
 
     private KeyValuePair<TKey, TValue>[] CreateSnapshot()

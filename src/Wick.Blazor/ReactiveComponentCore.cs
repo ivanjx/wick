@@ -18,11 +18,15 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
 {
     private static readonly EffectOptions s_defaultEffectOptions = new();
 
+    // Smallest owned list that is swept for items disposed early, see Own.
+    private const int MinOwnedSweepAt = 16;
+
     private readonly ComponentObserver _observer;
     private int _dirty;
     private int _pendingFlushes;
     private volatile bool _disposed;
     private List<IDisposable>? _owned;
+    private int _ownedSweepAt;
     private FlushWorkItem? _flushWorkItem;
 
     // Protected rather than private protected so the public API analyzer tracks the protected members that
@@ -196,7 +200,17 @@ public abstract class ReactiveComponentCore : ComponentBase, IDisposable, IAsync
         {
             if (!_disposed)
             {
-                (_owned ??= []).Add(owned);
+                _owned ??= [];
+
+                // Items disposed early are dropped once the list has doubled since the last sweep, so a component that
+                // keeps replacing its effects does not keep every replaced one, and what it captured, alive.
+                if (_owned.Count >= _ownedSweepAt)
+                {
+                    _owned.RemoveAll(static item => item is IDisposalState state && state.IsDisposed);
+                    _ownedSweepAt = Math.Max(MinOwnedSweepAt, _owned.Count * 2);
+                }
+
+                _owned.Add(owned);
 
                 return owned;
             }

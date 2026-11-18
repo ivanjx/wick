@@ -103,7 +103,8 @@ public abstract class ReactiveObserver : IDisposable
     {
         lock (_gate)
         {
-            if (!_collecting.Add(node) || _dependencies.Contains(node))
+            // Disposed during this tracking pass, perhaps by another thread: later reads must not subscribe again.
+            if (_disposed || !_collecting.Add(node) || _dependencies.Contains(node))
             {
                 return;
             }
@@ -112,6 +113,12 @@ public abstract class ReactiveObserver : IDisposable
         // Subscribe at read time rather than at the end of tracking: a write that happens after
         // this read but before tracking ends must still invalidate the observer.
         node.Subscribe(this);
+
+        // Dispose may have run between the check and the subscription, after unsubscribing from this node.
+        if (_disposed)
+        {
+            node.Unsubscribe(this);
+        }
     }
 
     internal void EndTracking(ReactiveObserver? previous)

@@ -61,6 +61,20 @@ public sealed class ReactiveListTests
     }
 
     [Fact]
+    public void Remove_all_leaves_the_list_unchanged_when_the_predicate_throws()
+    {
+        var list = new ReactiveList<int>([1, 2, 3, 4, 5]);
+        var observer = new CountingObserver();
+
+        observer.Track(() => list.ToArray());
+
+        Assert.Throws<InvalidOperationException>(() => list.RemoveAll(item => item == 4 ? throw new InvalidOperationException() : item % 2 == 0));
+
+        Assert.Equal([1, 2, 3, 4, 5], list.Snapshot());
+        Assert.Equal(0, observer.Invalidations);
+    }
+
+    [Fact]
     public void Enumeration_iterates_a_snapshot_that_mutations_do_not_affect()
     {
         var list = new ReactiveList<int>([1, 2, 3]);

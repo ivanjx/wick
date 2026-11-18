@@ -27,9 +27,6 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
     private const string ItemsNodeName = "ReactiveList<T>";
     private const string ChangesNodeName = "ReactiveList<T>.Changes";
 
-    // RemoveAll keeps one flag per item on the stack up to this many items, in a pooled array beyond.
-    private const int MaxStackallocMatches = 256;
-
     private readonly Lock _gate = new();
     private readonly List<T> _items;
     private T[]? _snapshot;
@@ -269,7 +266,10 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         NotifyCountAndItems();
     }
 
-    /// <summary>Removes every item matching <paramref name="match"/>, which runs under the list's lock and must not access the list.</summary>
+    /// <summary>
+    /// Removes every item matching <paramref name="match"/>, which runs under the list's lock and must not access the list.
+    /// The list is left unchanged when <paramref name="match"/> throws.
+    /// </summary>
     public int RemoveAll(Predicate<T> match)
     {
         ArgumentNullException.ThrowIfNull(match);
@@ -278,8 +278,7 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
         int removed;
         lock (_gate)
         {
-            var changes = WatchedChanges;
-            removed = changes is null ? _items.RemoveAll(match) : RemoveAll(match, changes);
+            removed = RemoveAll(match, WatchedChanges);
             if (removed == 0)
             {
                 return 0;
@@ -399,58 +398,69 @@ public sealed class ReactiveList<T> : IList<T>, IReadOnlyList<T>
     }
 
     /// <summary>
-    /// <see cref="List{T}.RemoveAll"/> that records each removal, at its index once the earlier ones are removed;
-    /// called under the lock. The list is left unchanged when <paramref name="match"/> throws.
+    /// <see cref="List{T}.RemoveAll"/> that tests every item before removing any, so the list is left unchanged when
+    /// <paramref name="match"/> throws, and records each removal, at its index once the earlier ones are removed, when
+    /// <paramref name="changes"/> is watched. Called under the lock.
     /// </summary>
-    private int RemoveAll(Predicate<T> match, CollectionChanges<ListChange<T>> changes)
+    private int RemoveAll(Predicate<T> match, CollectionChanges<ListChange<T>>? changes)
     {
-        var count = _items.Count;
-        bool[]? rented = null;
-        var matches = count <= MaxStackallocMatches
-            ? stackalloc bool[count]
-            : (rented = ArrayPool<bool>.Shared.Rent(count)).AsSpan(0, count);
+        // Read and compacted in place: match must not access the list, so its backing array stays the same.
+        var items = CollectionsMarshal.AsSpan(_items);
+
+        // Scanned without a buffer up to the first match, like List<T>.RemoveAll: removing nothing costs no more.
+        var first = 0;
+        while (first < items.Length && !match(items[first]))
+        {
+            first++;
+        }
+
+        if (first == items.Length)
+        {
+            return 0;
+        }
+
+        // One flag for each item after the first match. Pooled rather than stackalloc'd: the JIT does not tier up
+        // methods using stackalloc, so match would never be inlined into these loops by profile-guided optimization.
+        var start = first + 1;
+        var rest = items.Length - start;
+        var rented = ArrayPool<bool>.Shared.Rent(rest);
+        var matches = rented.AsSpan(0, rest);
 
         try
         {
-            // Every flag is written, so a rented buffer needs no clearing.
-            var removed = 0;
-            for (var i = 0; i < count; i++)
+            // Every flag is written, so the pooled buffer needs no clearing.
+            var removed = 1;
+            for (var i = 0; i < rest; i++)
             {
-                matches[i] = match(_items[i]);
+                matches[i] = match(items[start + i]);
                 if (matches[i])
                 {
                     removed++;
                 }
             }
 
-            if (removed == 0)
-            {
-                return 0;
-            }
+            changes?.Record(ListChange<T>.Removed(items[first], first));
 
-            var kept = 0;
-            for (var i = 0; i < count; i++)
+            var kept = first;
+            for (var i = 0; i < rest; i++)
             {
-                var item = _items[i];
+                var item = items[start + i];
                 if (matches[i])
                 {
-                    changes.Record(ListChange<T>.Removed(item, kept));
+                    changes?.Record(ListChange<T>.Removed(item, kept));
                     continue;
                 }
 
-                _items[kept++] = item;
+                items[kept++] = item;
             }
 
-            _items.RemoveRange(kept, _items.Count - kept);
+            _items.RemoveRange(kept, items.Length - kept);
 
             return removed;
         }
         finally
         {
-            if (rented is not null)
-            {
-                ArrayPool<bool>.Shared.Return(rented);
-            }
+            ArrayPool<bool>.Shared.Return(rented);
         }
     }
 

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Wick.Blazor.Tests.Components;
 using Wick.Core;
 
@@ -131,6 +132,35 @@ public sealed class ComponentEffectTests : ReactiveTestContext
         view.Dispose();
 
         Assert.Equal(0, State.ObserversOf(nameof(AppState.Count)));
+    }
+
+    [Fact]
+    public void Effects_disposed_early_are_not_kept_alive_by_their_component()
+    {
+        var view = Render<EffectView>().Instance;
+
+        // A component that keeps replacing an effect, for example when a parameter changes.
+        var first = CreateAndDispose(view);
+        for (var i = 0; i < 100; i++)
+        {
+            CreateAndDispose(view);
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Assert.False(first.IsAlive);
+        GC.KeepAlive(view);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private WeakReference CreateAndDispose(EffectView view)
+    {
+        var effect = view.CreateEffect(() => _ = State.Count);
+        effect.Dispose();
+
+        return new WeakReference(effect);
     }
 
     [Fact]

@@ -9,7 +9,7 @@ namespace Wick.Core;
 /// The value starts as the source's current value. Dispose it when its owner goes away: it is referenced by the state
 /// it reads and lives as long as that state otherwise.
 /// </remarks>
-public sealed class Debounced<T> : IDisposable
+public sealed class Debounced<T> : IDisposable, IDisposalState
 {
     private readonly ReactiveValue<T> _value = new(default!, "Debounced<T>");
     private readonly ReactiveEffect _follow;
@@ -23,6 +23,8 @@ public sealed class Debounced<T> : IDisposable
 
     /// <summary>The source's value as of the last time it settled.</summary>
     public T Value => _value.Value;
+
+    bool IDisposalState.IsDisposed => ((IDisposalState)_follow).IsDisposed;
 
     /// <summary>Stops following the source; a pending update is dropped.</summary>
     public void Dispose() => _follow.Dispose();

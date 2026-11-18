@@ -113,6 +113,25 @@ public sealed class DependencyTrackingTests
     }
 
     [Fact]
+    public void Reads_after_an_observer_was_disposed_during_its_tracking_pass_do_not_subscribe()
+    {
+        var state = new AppState();
+        var observer = new CountingObserver();
+
+        // For example an effect disposed from another thread while its run is still reading state.
+        observer.Track(() =>
+        {
+            _ = state.Count;
+            observer.Dispose();
+
+            return state.Label;
+        });
+
+        Assert.Equal(0, state.Node(nameof(AppState.Count))!.ObserverCount);
+        Assert.Equal(0, state.Node(nameof(AppState.Label))!.ObserverCount);
+    }
+
+    [Fact]
     public void An_exception_during_tracking_restores_the_tracking_context()
     {
         var state = new AppState();

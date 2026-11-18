@@ -76,10 +76,10 @@ One cell of a rendered grid changes. In the traditional version, the grid subscr
 
 | Cells | Approach | Components re-rendered | Time per update | Allocated |
 |------:|----------|-----------------------:|----------------:|----------:|
-| 100 | Traditional | 101 | 38.9 μs | 3,265 B |
-| 100 | Wick | 1 | 1.9 μs | 40 B |
-| 400 | Traditional | 401 | 129.1 μs | 12,864 B |
-| 400 | Wick | 1 | 1.9 μs | 32 B |
+| 100 | Traditional | 101 | 23.0 μs | 3,264 B |
+| 100 | Wick | 1 | 1.3 μs | 40 B |
+| 400 | Traditional | 401 | 86.5 μs | 12,864 B |
+| 400 | Wick | 1 | 1.4 μs | 32 B |
 
 The traditional version gets slower as the grid grows; Wick's cost stays flat, because only the changed cell re-renders. Wick's time includes its hop to the thread pool.
 

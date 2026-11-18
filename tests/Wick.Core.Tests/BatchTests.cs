@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Wick.Core.Tests;
 
 public sealed class BatchTests
@@ -136,5 +138,53 @@ public sealed class BatchTests
         state.Count = 2;
 
         Assert.Equal(2, observer.Invalidations);
+    }
+
+    [Fact]
+    public void A_completed_async_batch_kept_reachable_by_work_it_started_does_not_keep_its_state_alive()
+    {
+        var pending = new TaskCompletionSource();
+
+        var node = BatchAsyncThenForget(pending.Task);
+        CollectGarbage();
+
+        Assert.False(node.IsAlive);
+        GC.KeepAlive(pending);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference BatchAsyncThenForget(Task pending)
+    {
+        var node = new ReactiveNode();
+        var observer = new CountingObserver();
+        observer.Track(() =>
+        {
+            node.Track();
+            return 0;
+        });
+
+        var batch = Reactive.BatchAsync(() =>
+        {
+            node.Notify();
+
+            // Outlives the batch: its continuation captures the batch's execution context.
+            _ = WaitAsync(pending);
+
+            return Task.CompletedTask;
+        });
+
+        Assert.True(batch.IsCompletedSuccessfully);
+        Assert.Equal(1, observer.Invalidations);
+
+        return new WeakReference(node);
+
+        static async Task WaitAsync(Task task) => await task;
+    }
+
+    private static void CollectGarbage()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 }

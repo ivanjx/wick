@@ -23,7 +23,7 @@ namespace Wick.Core;
 /// <see cref="Rerun"/> requests a run without a change, for example to reload data on a <em>Refresh</em> button.
 /// </para>
 /// </remarks>
-public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
+public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner, IDisposalState
 {
     /// <summary>
     /// How many runs in a row an effect may trigger itself, by writing state it read or calling <see cref="Rerun"/>,
@@ -101,6 +101,8 @@ public abstract class ReactiveEffect : IDisposable, IReactiveObserverOwner
     ReactiveObserver IReactiveObserverOwner.Observer => _observer;
 
     private protected bool IsDisposed => _observer.Disposed;
+
+    bool IDisposalState.IsDisposed => IsDisposed;
 
     /// <summary>True once disposed without <see cref="EffectOptions.FlushOnDispose"/>: no run may start any more.</summary>
     private protected bool IsStopped => _observer.Disposed && !_flushOnDispose;
