@@ -3,7 +3,7 @@
 <p>Average price</p>
 <div class="big">@Market.AveragePrice.ToString("N2")</div>
 <p class="hint">
-    Renders: <RenderCount Value="++_renders" /> · reads a <code>Reactive.Derived</code> average that is computed
+    Renders: <RenderCount Value="++_renders" /> · reads a memoized average that is computed
     once per tick for every open tab. The feed wraps each tick in <code>Reactive.Batch</code>, so it changes once
     per tick even when several prices move.
 </p>

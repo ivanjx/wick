@@ -317,11 +317,34 @@ Within a single synchronous Blazor event handler you rarely need this: renders a
 
 ### Derived values
 
-A computed property runs on every read. When the computation is expensive, or many components read it, cache it with `Reactive.Derived`:
+A computed property runs on every read. When the computation is expensive, or many components read it, cache it with `Memo`, which `[ReactiveState]` types (and `ReactiveObject` subclasses) get for free:
 
 ```csharp
-public ReactiveList<CartItem> Items { get; } = [];
+[ReactiveState]
+public partial class CartState
+{
+    public ReactiveList<CartItem> Items { get; } = [];
 
+    public partial decimal Discount { get; set; }
+
+    // Cheap: recompute on every read.
+    public bool HasDiscount => Discount > 0;
+
+    // Cached; the lambda captures `this`, so each read allocates a small delegate.
+    public decimal Subtotal => Memo(() => Items.Sum(item => item.Price * item.Quantity));
+
+    // Cached; a static lambda is allocated once by the compiler, so reads don't allocate.
+    public decimal Total => Memo(static (CartState state) => state.Subtotal - state.Discount);
+}
+```
+
+The value is recomputed once when its inputs change, and its readers re-render only if the result actually changed.
+
+Each call site gets one cached value per instance, created on first read from the lambda passed then; later reads only look it up. So call `Memo` directly in a property getter, and read reactive state inside the lambda instead of capturing locals, which would keep their first value. The compiler warns otherwise ([WK0017, WK0018](#diagnostics)). Both forms behave the same; the static one only avoids the delegate allocation. If your type already has a member named `Memo`, the helpers are not generated (WK0016).
+
+`Memo` is a shorthand for `Reactive.Derived`, which remains available, for example to pass a custom equality comparer or to cache a value outside a state class:
+
+```csharp
 private readonly Derived<decimal> _total;
 
 public CartState()
@@ -332,8 +355,6 @@ public CartState()
 
 public decimal Total => _total.Value;
 ```
-
-The value is recomputed once when its inputs change, and its readers re-render only if the result actually changed.
 
 ### Effects
 
@@ -655,6 +676,9 @@ The analyzers described under [Diagnostics](#diagnostics) help with the rest:
 | WK0013 | Warning | Another source generator implements this partial property, so it is not reactive |
 | WK0014 | Info (off by default) | `StateHasChanged()` in a reactive component, which re-renders by itself |
 | WK0015 | Error | `NotifyPropertyChanged = true` can't be used: the type implements `INotifyPropertyChanged` without a usable `OnPropertyChanged(string)`, or declares members named `PropertyChanged`/`OnPropertyChanged` |
+| WK0016 | Info | The `Memo` helpers aren't generated because the type declares or inherits a member named `Memo` |
+| WK0017 | Warning | `Memo` is called outside the getter of a property without parameters (a method, indexer, lambda or constructor), so one cached value would serve every call |
+| WK0018 | Warning | A `Memo` computation captures a local or parameter, of which only the first value is used |
 
 WK0001, WK0002, WK0006, WK0007, WK0011 and WK0012 come with IDE quick fixes: add `partial`, switch to the reactive collection, override `Dispose(bool)`/`DisposeAsyncCore()`, remove the redundant subscription, or convert the toolkit class. For WK0007 and WK0011, the fix only applies to C# files; in a `.razor` file, make the change yourself.
 

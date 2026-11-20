@@ -1,0 +1,18 @@
+@inject CartState Cart
+
+<p class="hint">List renders: <RenderCount Value="++_renders" /> · reads the list, so only adding or removing a line re-renders it.</p>
+
+<ul class="lines">
+    @foreach (var line in Cart.Lines)
+    {
+        <CartLineRow @key="line.Id" Line="line" />
+    }
+</ul>
+
+<div class="row">
+    <button @onclick="Cart.AddRandom">Add a random item</button>
+</div>
+
+@code {
+    private int _renders;
+}

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Wick.Core;
@@ -15,6 +16,7 @@ public abstract class ReactiveObject : IReactiveState
 {
     private readonly Lock _nodesGate = new();
     private Dictionary<string, ReactiveNode>? _nodes;
+    private MemoCache? _memos;
 
     /// <summary>Records the read of <paramref name="property"/> while tracking, then returns <paramref name="field"/>.</summary>
     /// <param name="field">The property's backing field.</param>
@@ -58,6 +60,55 @@ public abstract class ReactiveObject : IReactiveState
 
         return true;
     }
+
+    /// <summary>
+    /// Caches a value computed from reactive state, like <see cref="Reactive.Derived{T}"/> without declaring a field:
+    /// <code>
+    /// public decimal Total => Memo(() => Price * Quantity);
+    /// </code>
+    /// The first read creates one <see cref="Derived{T}"/> per instance and call site; later reads return its value
+    /// and ignore <paramref name="compute"/>, so it should read only reactive state.
+    /// </summary>
+    /// <remarks>
+    /// Each call allocates the lambda when it captures <c>this</c>; the
+    /// <see cref="Memo{TState, TValue}(Func{TState, TValue}, string, string, int, string)"/> form with a static lambda
+    /// does not. Call it directly in a property getter; the call site identifies the memo.
+    /// </remarks>
+    /// <param name="compute">The computation, used on the first read only.</param>
+    /// <param name="callerMember">Supplied by the compiler.</param>
+    /// <param name="callerFile">Supplied by the compiler.</param>
+    /// <param name="callerLine">Supplied by the compiler.</param>
+    /// <param name="callerExpression">Supplied by the compiler.</param>
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The optional parameters are caller information; the overloads differ by the delegate's arity.")]
+    protected TValue Memo<TValue>(
+        Func<TValue> compute,
+        [CallerMemberName] string callerMember = "",
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0,
+        [CallerArgumentExpression(nameof(compute))] string callerExpression = "")
+        => MemoCache.Get(ref _memos, this, compute, callerMember, callerFile, callerLine, callerExpression);
+
+    /// <summary>
+    /// Like <see cref="Memo{TValue}(Func{TValue}, string, string, int, string)"/>, for a computation that receives
+    /// this object, so that a static lambda reads without allocating:
+    /// <code>
+    /// public decimal Total => Memo(static (CartState state) => state.Price * state.Quantity);
+    /// </code>
+    /// </summary>
+    /// <param name="compute">The computation, used on the first read only; its parameter must be this object's type.</param>
+    /// <param name="callerMember">Supplied by the compiler.</param>
+    /// <param name="callerFile">Supplied by the compiler.</param>
+    /// <param name="callerLine">Supplied by the compiler.</param>
+    /// <param name="callerExpression">Supplied by the compiler.</param>
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The optional parameters are caller information; the overloads differ by the delegate's arity.")]
+    protected TValue Memo<TState, TValue>(
+        Func<TState, TValue> compute,
+        [CallerMemberName] string callerMember = "",
+        [CallerFilePath] string callerFile = "",
+        [CallerLineNumber] int callerLine = 0,
+        [CallerArgumentExpression(nameof(compute))] string callerExpression = "")
+        where TState : ReactiveObject
+        => MemoCache.Get(ref _memos, this, compute, callerMember, callerFile, callerLine, callerExpression);
 
     ReactiveNode? IReactiveState.FindNode(string propertyName) => FindNode(propertyName);
 

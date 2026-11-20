@@ -1,0 +1,13 @@
+@inject CartState Cart
+
+<p>
+    Shipping: <strong>@((Cached ? Cart.FreeShipping : Cart.UncachedFreeShipping) ? "Free" : "Paid")</strong>
+    <RenderCount Value="++_renders" />
+</p>
+
+@code {
+    private int _renders;
+
+    [Parameter]
+    public bool Cached { get; set; }
+}

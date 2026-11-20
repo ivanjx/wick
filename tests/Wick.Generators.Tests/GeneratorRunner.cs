@@ -22,7 +22,7 @@ internal static class GeneratorRunner
         var compilation = CreateCompilation(source, languageVersion);
         var driver = CreateDriver(languageVersion).RunGeneratorsAndUpdateCompilation(compilation, out var output, out var generatorDiagnostics);
         var analyzerDiagnostics = output
-            .WithAnalyzers([new ReactiveStateAnalyzer()])
+            .WithAnalyzers([new ReactiveStateAnalyzer(), new MemoAnalyzer()])
             .GetAnalyzerDiagnosticsAsync(TestContext.Current.CancellationToken)
             .GetAwaiter()
             .GetResult();

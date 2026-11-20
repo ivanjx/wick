@@ -10,6 +10,7 @@ namespace Wick.Generators;
 
 /// <summary>Everything needed to emit one reactive state type. Value-equatable so the pipeline caches.</summary>
 /// <param name="PropertyChanged">Whether setters raise <c>INotifyPropertyChanged.PropertyChanged</c>, and who declares it.</param>
+/// <param name="MemoTypeParameter">The result type parameter name of the generated <c>Memo</c> helpers; null to omit them.</param>
 internal sealed record StateModel(
     string HintName,
     string? Namespace,
@@ -18,7 +19,8 @@ internal sealed record StateModel(
     bool IsSealed,
     bool HasReactiveBase,
     PropertyChangedKind PropertyChanged,
-    EquatableArray<PropertyModel> Properties);
+    EquatableArray<PropertyModel> Properties,
+    string? MemoTypeParameter);
 
 /// <summary>A <c>partial</c> type declaration header, e.g. keyword <c>record struct</c> and name <c>Outer&lt;T&gt;</c>.</summary>
 internal sealed record TypeHeader(string Keyword, string Name);

@@ -20,3 +20,6 @@ WK0012 | Wick | Info | CommunityToolkit.Mvvm observable properties can become re
 WK0013 | Wick | Warning | Partial property is implemented by another source generator
 WK0014 | Wick | Disabled | StateHasChanged in a reactive component
 WK0015 | Wick | Error | Generated properties cannot raise PropertyChanged
+WK0016 | Wick | Info | Memo helpers are not generated
+WK0017 | Wick | Warning | Memo is called outside a property getter
+WK0018 | Wick | Warning | Memo computation captures a local variable or parameter

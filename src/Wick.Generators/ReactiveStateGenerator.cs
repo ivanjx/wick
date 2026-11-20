@@ -32,6 +32,8 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
     private const string NodeFieldPrefix = "__reactiveNode_";
     private const string ComparerFieldPrefix = "__reactiveComparer_";
     private const string FindNodeMethod = "__FindReactiveNode";
+    private const string MemoMethod = "Memo";
+    private const string MemoCacheField = "__memoCache";
 
     private static readonly SymbolDisplayFormat TypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
         .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
@@ -139,6 +141,12 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             properties.Add(CreatePropertyModel(property, syntax, nullableContext, equality, comparerType));
         }
 
+        var memoConflict = FindMemoConflict(type, context.SemanticModel.Compilation);
+        if (memoConflict is not null)
+        {
+            diagnostics.Add(DiagnosticInfo.Create(Diagnostics.MemoNotGenerated, declaration.Identifier.GetLocation(), typeName, memoConflict));
+        }
+
         if (diagnostics.Any(diagnostic => diagnostic.Descriptor.DefaultSeverity == DiagnosticSeverity.Error))
         {
             return new GenerationResult(null, new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()));
@@ -152,7 +160,8 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             IsSealed: type.IsSealed,
             HasReactiveBase: HasReactiveBase(type),
             PropertyChanged: propertyChanged,
-            Properties: new EquatableArray<PropertyModel>(properties.ToImmutable()));
+            Properties: new EquatableArray<PropertyModel>(properties.ToImmutable()),
+            MemoTypeParameter: memoConflict is null ? ChooseMemoTypeParameter(type) : null);
 
         return new GenerationResult(state, new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()));
     }
@@ -181,6 +190,46 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// A member the generated <c>Memo</c> helpers would clash with or hide, declared by the type or inherited from a base,
+    /// as display text; null when there is none. The private helpers generated for reactive bases are invisible here.
+    /// </summary>
+    private static string? FindMemoConflict(INamedTypeSymbol type, Compilation compilation)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            var conflict = current.GetMembers().FirstOrDefault(member =>
+                !member.IsImplicitlyDeclared
+                && member.Name is MemoMethod or MemoCacheField
+                && (SymbolEqualityComparer.Default.Equals(current, type) || compilation.IsSymbolAccessibleWithin(member, type)));
+
+            if (conflict is not null)
+            {
+                return conflict.ToDisplayString(SymbolDisplayFormat.CSharpShortErrorMessageFormat);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary><c>TValue</c>, unless the type or a containing type already declares a type parameter of that name.</summary>
+    private static string ChooseMemoTypeParameter(INamedTypeSymbol type)
+    {
+        var taken = new HashSet<string>();
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            taken.UnionWith(current.TypeParameters.Select(parameter => parameter.Name));
+        }
+
+        var name = "TValue";
+        while (taken.Contains(name))
+        {
+            name = "T" + name;
+        }
+
+        return name;
     }
 
     /// <summary>
@@ -482,6 +531,11 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             writer.Line($"private {Core}.ReactiveNode? {NodeFieldPrefix}{property.Name};");
         }
 
+        if (state.MemoTypeParameter is not null)
+        {
+            writer.Line($"private {Core}.MemoCache? {MemoCacheField};");
+        }
+
         if (state.PropertyChanged == PropertyChangedKind.Declare)
         {
             writer.Line();
@@ -491,6 +545,11 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
             writer.Line("/// <summary>Raises <see cref=\"PropertyChanged\"/>; the generated setters call it when a write notifies.</summary>");
             writer.Line("/// <param name=\"propertyName\">The name of the property that changed.</param>");
             writer.Line($"{(state.IsSealed ? "private" : "protected virtual")} void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new {PropertyChangedNamespace}.PropertyChangedEventArgs(propertyName));");
+        }
+
+        if (state.MemoTypeParameter is not null)
+        {
+            EmitMemo(writer, state, state.MemoTypeParameter);
         }
 
         foreach (var property in state.Properties)
@@ -607,6 +666,38 @@ public sealed class ReactiveStateGenerator : IIncrementalGenerator
         return writer.ToString();
 
         static string Prefix(string modifiers) => modifiers.Length == 0 ? "" : modifiers + " ";
+    }
+
+    /// <summary>
+    /// The private <c>Memo</c> helpers: a lambda form, and a form whose computation receives the state so that it can
+    /// be a static lambda. Both forward to <c>MemoCache</c>, keyed by the caller information the compiler supplies.
+    /// </summary>
+    private static void EmitMemo(CodeWriter writer, StateModel state, string value)
+    {
+        const string CompilerServices = "global::System.Runtime.CompilerServices";
+
+        string[] forms =
+        [
+            $"global::System.Func<{value}>",
+            $"global::System.Func<{state.Type.Name}, {value}>",
+        ];
+
+        foreach (var compute in forms)
+        {
+            writer.Line();
+            writer.Line("/// <summary>");
+            writer.Line("/// Caches a value computed from reactive state: the first read creates one <see cref=\"global::Wick.Core.Derived{T}\"/> per");
+            writer.Line("/// instance and call site, and later reads return its value. The computation is kept from the first read, so it");
+            writer.Line("/// should read reactive state rather than capture locals. Call it directly in a property getter.");
+            writer.Line("/// </summary>");
+            writer.Line($"private {value} {MemoMethod}<{value}>(");
+            writer.Line($"    {compute} compute,");
+            writer.Line($"    [{CompilerServices}.CallerMemberName] string callerMember = \"\",");
+            writer.Line($"    [{CompilerServices}.CallerFilePath] string callerFile = \"\",");
+            writer.Line($"    [{CompilerServices}.CallerLineNumber] int callerLine = 0,");
+            writer.Line($"    [{CompilerServices}.CallerArgumentExpression(\"compute\")] string callerExpression = \"\")");
+            writer.Line($"    => {Core}.MemoCache.Get(ref {MemoCacheField}, this, compute, callerMember, callerFile, callerLine, callerExpression);");
+        }
     }
 
     private sealed class CodeWriter

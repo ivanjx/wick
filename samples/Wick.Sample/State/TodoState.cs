@@ -22,8 +22,9 @@ public enum TodoFilter
 
 /// <summary>
 /// Items live in a <see cref="ReactiveList{T}"/>: adding or removing re-renders the readers of the list, while
-/// toggling or renaming an item re-renders only the components that read that item. <see cref="Visible"/> and
-/// <see cref="Remaining"/> are cached derived values, and an effect and two watches write the activity log.
+/// toggling or renaming an item re-renders only the components that read that item. <see cref="Remaining"/> is a
+/// memo, <see cref="Visible"/> a derived value with a custom comparer, and an effect and two watches write the
+/// activity log.
 /// </summary>
 [ReactiveState]
 public sealed partial class TodoState : IDisposable
@@ -34,14 +35,14 @@ public sealed partial class TodoState : IDisposable
         EqualityComparer<ImmutableArray<TodoItem>>.Create((left, right) => left.SequenceEqual(right));
 
     private readonly Derived<ImmutableArray<TodoItem>> _visible;
-    private readonly Derived<int> _remaining;
     private readonly ReactiveEffect _logRemaining;
     private readonly ReactiveEffect _logFilter;
     private readonly ReactiveEffect _logItems;
 
     public TodoState()
     {
-        // Readers of Visible re-render only when the set of shown items changes, not on every toggle.
+        // Readers of Visible re-render only when the set of shown items changes, not on every toggle. Memo compares
+        // results with the default equality, so a custom comparer needs Reactive.Derived.
         _visible = Reactive.Derived(
             () => Filter switch
             {
@@ -50,8 +51,6 @@ public sealed partial class TodoState : IDisposable
                 _ => Items.Snapshot(),
             },
             SameItems);
-
-        _remaining = Reactive.Derived(() => Items.Count(item => !item.Done));
 
         // Effects may write state: the log is reactive too. Re-runs happen on the thread pool.
         _logRemaining = Reactive.Effect(() => Log($"{Remaining} of {Items.Count} left"));
@@ -88,7 +87,7 @@ public sealed partial class TodoState : IDisposable
 
     public ImmutableArray<TodoItem> Visible => _visible.Value;
 
-    public int Remaining => _remaining.Value;
+    public int Remaining => Memo(static (TodoState state) => state.Items.Count(item => !item.Done));
 
     public void Add(string title) => Items.Add(new TodoItem { Title = title });
 
@@ -122,6 +121,5 @@ public sealed partial class TodoState : IDisposable
         _logFilter.Dispose();
         _logItems.Dispose();
         _visible.Dispose();
-        _remaining.Dispose();
     }
 }

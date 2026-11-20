@@ -1,0 +1,18 @@
+@inject CartState Cart
+
+<p><code>FreeShipping</code> (Memo): <strong>@Cart.ShippingRuns</strong> computations</p>
+<p><code>UncachedFreeShipping</code>: <strong>@Cart.UncachedShippingRuns</strong> computations</p>
+
+<div class="row">
+    <button class="secondary" @onclick="() => { }">Refresh counts</button>
+</div>
+
+<p class="hint">
+    Renders: <RenderCount Value="++_renders" /> · the counters are plain fields, not reactive state, so this card
+    updates only when you refresh it. The memo computes once per change of the total, shared by every reader; the
+    plain getter once per reader render.
+</p>
+
+@code {
+    private int _renders;
+}

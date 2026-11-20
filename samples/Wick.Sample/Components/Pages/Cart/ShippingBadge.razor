@@ -1,0 +1,12 @@
+@inject CartState Cart
+
+<div class="big">@(Cart.FreeShipping ? "Free" : "Paid")</div>
+<p>Free from @CartState.FreeShippingThreshold.ToString("C")</p>
+<p class="hint">
+    Renders: <RenderCount Value="++_renders" /> · reads the memo <code>FreeShipping</code>, which is recomputed
+    whenever the total changes, but re-renders this only when it flips.
+</p>
+
+@code {
+    private int _renders;
+}

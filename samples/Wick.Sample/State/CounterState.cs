@@ -10,7 +10,7 @@ public sealed partial class CounterState
     public partial int Step { get; set; } = 1;
 
     // Computed properties need nothing special: they read Count, so whoever reads them depends on Count.
-    // They are recomputed on every read; use Reactive.Derived to cache an expensive computation.
+    // They are recomputed on every read; wrap an expensive computation in Memo to cache it (see CartState).
     public int Doubled => Count * 2;
 
     public bool IsEven => Count % 2 == 0;

@@ -22,7 +22,7 @@ public sealed class Derived<T> : IDisposable, IReactiveObserverOwner
     private readonly Lock _gate = new();
     private readonly Func<T> _compute;
     private readonly IEqualityComparer<T> _comparer;
-    private readonly ReactiveNode _node = new("Derived<T>");
+    private readonly ReactiveNode _node;
     private readonly SourceObserver _observer;
     private T _value = default!;
     private ExceptionDispatchInfo? _error;
@@ -38,10 +38,11 @@ public sealed class Derived<T> : IDisposable, IReactiveObserverOwner
     private int _versionWhenStale;
     private bool _refreshPending;
 
-    internal Derived(Func<T> compute, IEqualityComparer<T>? comparer)
+    internal Derived(Func<T> compute, IEqualityComparer<T>? comparer, string name = "Derived<T>")
     {
         _compute = compute;
         _comparer = comparer ?? EqualityComparer<T>.Default;
+        _node = new ReactiveNode(name);
         _observer = new SourceObserver(this);
     }
 

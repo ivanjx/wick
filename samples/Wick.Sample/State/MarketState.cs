@@ -17,23 +17,6 @@ public sealed partial class Ticker
 [ReactiveState]
 public sealed partial class MarketState
 {
-    // Singleton for the lifetime of the app, so the derived values are never disposed.
-    private readonly Derived<double> _averagePrice;
-    private readonly Derived<string> _mood;
-
-    public MarketState()
-    {
-        _averagePrice = Reactive.Derived(() => Tickers.Average(ticker => ticker.Price));
-
-        _mood = Reactive.Derived(() =>
-        {
-            var advancing = Tickers.Count(ticker => ticker.Change > 0);
-            var declining = Tickers.Count(ticker => ticker.Change < 0);
-
-            return advancing > declining ? "Bullish" : advancing < declining ? "Bearish" : "Flat";
-        });
-    }
-
     public IReadOnlyList<Ticker> Tickers { get; } =
     [
         new() { Symbol = "AAPL", Price = 190 },
@@ -92,11 +75,17 @@ public sealed partial class MarketState
 
     public partial long PriceUpdates { get; set; }
 
-    // Computed once per tick on the feed thread, however many circuits read it.
-    public double AveragePrice => _averagePrice.Value;
+    // Memoized: computed once per tick on the feed thread, however many circuits read it.
+    public double AveragePrice => Memo(static (MarketState market) => market.Tickers.Average(ticker => ticker.Price));
 
     // Recomputed every tick too, but readers re-render only when the result flips.
-    public string Mood => _mood.Value;
+    public string Mood => Memo(static (MarketState market) =>
+    {
+        var advancing = market.Tickers.Count(ticker => ticker.Change > 0);
+        var declining = market.Tickers.Count(ticker => ticker.Change < 0);
+
+        return advancing > declining ? "Bullish" : advancing < declining ? "Bearish" : "Flat";
+    });
 
     /// <summary>Moves one to five random tickers.</summary>
     public void Tick(Random random)

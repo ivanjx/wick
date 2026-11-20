@@ -14,7 +14,8 @@ namespace Wick.Core;
 /// <remarks>
 /// Names come from the state: <see cref="ReactiveStateAttribute"/> properties and <see cref="ReactiveObject"/>
 /// properties are named <c>TypeName.PropertyName</c>, collections <c>ReactiveList&lt;T&gt;</c>,
-/// <c>ReactiveList&lt;T&gt;.Count</c> or <c>ReactiveDictionary[key]</c>, and derived values <c>Derived&lt;T&gt;</c>.
+/// <c>ReactiveList&lt;T&gt;.Count</c> or <c>ReactiveDictionary[key]</c>, derived values <c>Derived&lt;T&gt;</c>, and memos
+/// <c>TypeName.PropertyName</c> like properties.
 /// Per-key collection nodes include the formatted key only when they are created while diagnostics are enabled.
 /// While <see cref="Enabled"/> is false, Wick checks the flag and nothing else: no change is recorded or formatted.
 /// </remarks>

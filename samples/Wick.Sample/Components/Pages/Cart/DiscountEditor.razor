@@ -1,0 +1,11 @@
+@inject CartState Cart
+
+<label>
+    Discount (%)
+    <input type="number" min="0" max="100" @bind="Cart.DiscountPercent" @bind:event="oninput" />
+</label>
+<p class="hint">Renders: <RenderCount Value="++_renders" /> · reads only <code>DiscountPercent</code>.</p>
+
+@code {
+    private int _renders;
+}

@@ -11,6 +11,7 @@ builder.Services.AddScoped<CounterState>();
 builder.Services.AddScoped<GridState>();
 builder.Services.AddScoped<ProfileState>();
 builder.Services.AddScoped<TodoState>();
+builder.Services.AddScoped<CartState>();
 builder.Services.AddScoped<SearchState>();
 builder.Services.AddScoped<DraftState>();
 

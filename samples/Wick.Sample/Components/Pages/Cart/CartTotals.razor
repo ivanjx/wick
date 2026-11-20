@@ -1,0 +1,12 @@
+@inject CartState Cart
+
+<div class="big">@Cart.Total.ToString("C")</div>
+<p>@Cart.ItemCount items · subtotal @Cart.Subtotal.ToString("C")</p>
+<p class="hint">
+    Renders: <RenderCount Value="++_renders" /> · reads the memos <code>Total</code> and <code>Subtotal</code> and the
+    plain <code>ItemCount</code>.
+</p>
+
+@code {
+    private int _renders;
+}

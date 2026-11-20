@@ -1,0 +1,17 @@
+@inject CartState Cart
+
+<li>
+    <span class="title">@Line.Name</span>
+    <span class="hint">@Line.Price.ToString("C")</span>
+    <button class="secondary" @onclick="() => Cart.Decrement(Line)">−</button>
+    <strong>@Line.Quantity</strong>
+    <button class="secondary" @onclick="() => Line.Quantity++">+</button>
+    <RenderCount Value="++_renders" />
+</li>
+
+@code {
+    private int _renders;
+
+    [Parameter, EditorRequired]
+    public CartLine Line { get; set; } = default!;
+}

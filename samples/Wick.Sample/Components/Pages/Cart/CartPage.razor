@@ -1,0 +1,70 @@
+@page "/cart"
+@inject CartState Cart
+
+<PageTitle>Memo</PageTitle>
+
+<h1>Memo <RenderCount Value="++_renders" /></h1>
+<p class="lead">
+    <code>Memo</code> caches a computed property of a <code>[ReactiveState]</code> class without declaring a
+    <code>Derived&lt;T&gt;</code> field. It is recomputed once when what it read changes, however many components
+    read it, and its readers re-render only when the result differs.
+</p>
+
+<p>
+    This cart's state uses each kind of computed property: <code>ItemCount</code> is a plain getter, cheap enough to
+    run on every read. <code>Subtotal</code> is a memo over the cart lines, <code>Total</code> a memo that reads
+    <code>Subtotal</code> and the discount, and <code>FreeShipping</code> a memo over <code>Total</code> whose result
+    rarely changes. A memo can take a lambda, or a static lambda that receives the state, which reads without
+    allocating; both behave the same.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <h2>Cart</h2>
+        <CartLinesView />
+    </div>
+
+    <div class="card">
+        <h2>Totals</h2>
+        <CartTotals />
+        <DiscountEditor />
+    </div>
+
+    <div class="card">
+        <h2>Shipping</h2>
+        <ShippingBadge />
+    </div>
+</div>
+
+<h2>Cached vs uncached readers</h2>
+<p class="hint">
+    Three components read the memo <code>FreeShipping</code> and three read <code>UncachedFreeShipping</code>, a plain
+    getter with the same check. Change a quantity or the discount without crossing
+    @CartState.FreeShippingThreshold.ToString("C"): only the plain getter readers re-render. Refresh the counts to
+    compare computations.
+</p>
+
+<div class="cards">
+    <div class="card">
+        <h2>Memo readers</h2>
+        <ShippingReader Cached="true" />
+        <ShippingReader Cached="true" />
+        <ShippingReader Cached="true" />
+    </div>
+
+    <div class="card">
+        <h2>Plain getter readers</h2>
+        <ShippingReader Cached="false" />
+        <ShippingReader Cached="false" />
+        <ShippingReader Cached="false" />
+    </div>
+
+    <div class="card">
+        <h2>Computations</h2>
+        <RunCounts />
+    </div>
+</div>
+
+@code {
+    private int _renders;
+}

@@ -126,4 +126,29 @@ internal static class Diagnostics
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor MemoNotGenerated = new(
+        id: "WK0016",
+        title: "Memo helpers are not generated",
+        messageFormat: "The Memo helpers are not generated for '{0}' because '{1}' already uses the name; rename it to use Memo, or keep using Reactive.Derived",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor MemoOutsideGetter = new(
+        id: "WK0017",
+        title: "Memo is called outside a property getter",
+        messageFormat: "Memo is cached per call site and keeps the computation of its first call; call it directly in the getter of a property without parameters, not in {0}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Each Memo call site owns one cached value for the lifetime of the object. Calls from methods, indexers or lambdas share that value across different arguments and invocations; use Reactive.Derived for those cases.");
+
+    public static readonly DiagnosticDescriptor MemoCapturesLocal = new(
+        id: "WK0018",
+        title: "Memo computation captures a local variable or parameter",
+        messageFormat: "The Memo computation captures '{0}', but only its first value is used; read reactive state inside the computation instead",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
 }

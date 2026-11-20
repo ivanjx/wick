@@ -1,1 +1,6 @@
 #nullable enable
+Wick.Core.MemoCache
+static Wick.Core.MemoCache.Get<TValue>(ref Wick.Core.MemoCache? cache, object! owner, System.Func<TValue>! compute, string! member, string! file, int line, string! expression) -> TValue
+static Wick.Core.MemoCache.Get<TState, TValue>(ref Wick.Core.MemoCache? cache, object! owner, System.Func<TState!, TValue>! compute, string! member, string! file, int line, string! expression) -> TValue
+Wick.Core.ReactiveObject.Memo<TState, TValue>(System.Func<TState!, TValue>! compute, string! callerMember = "", string! callerFile = "", int callerLine = 0, string! callerExpression = "") -> TValue
+Wick.Core.ReactiveObject.Memo<TValue>(System.Func<TValue>! compute, string! callerMember = "", string! callerFile = "", int callerLine = 0, string! callerExpression = "") -> TValue
