@@ -1,0 +1,13 @@
+@* Every 1,000th message of each thread. Where() enumerates the whole list, as a filter or a grouping in a
+   real page would, so it runs into writes that happen during the render. *@
+<ul class="log">
+    @foreach (var message in Messages.Where(message => message.Index % 1000 == 999))
+    {
+        <li>thread @message.Thread: message @((message.Index + 1).ToString("N0"))</li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired]
+    public IEnumerable<Message> Messages { get; set; } = [];
+}

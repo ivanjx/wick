@@ -20,6 +20,8 @@ internal static class Program
         // One window, one user: the Blazor components and the native controls share these instances.
         services.AddSingleton<CounterState>();
         services.AddSingleton<LogState>();
+        services.AddSingleton<ClassicFeedState>();
+        services.AddSingleton<FeedState>();
 
         using var provider = services.BuildServiceProvider();
         Application.Run(new MainForm(provider));

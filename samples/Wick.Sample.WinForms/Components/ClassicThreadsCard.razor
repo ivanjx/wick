@@ -1,0 +1,48 @@
+@* Opts out of Wick: the usual Blazor way, a state class with a Changed event and a manual StateHasChanged. *@
+@inherits ComponentBase
+@implements IDisposable
+@inject ClassicFeedState Feed
+
+<div class="card" id="classic-threads-card">
+    <h2>Classic: List&lt;T&gt; + StateHasChanged <RenderCount Value="++_renders" /></h2>
+    <div class="big" id="classic-threads-count">@Feed.Messages.Count.ToString("N0") <small>of @BackgroundWriters.Total.ToString("N0")</small></div>
+
+    <Checkpoints Messages="Feed.Messages" />
+
+    <div class="row">
+        <button id="classic-run" disabled="@_running" @onclick="RunAsync">List.Add</button>
+    </div>
+    <div class="row">
+        <button id="classic-crash" class="danger" disabled="@_running" @onclick="WriteFromThreadPool">One write from the thread pool (crashes the app)</button>
+    </div>
+
+    <Exceptions Tally="_errors" />
+
+    <p class="hint">@BackgroundWriters.Threads threads add to a <code>List&lt;T&gt;</code>; the <code>Changed</code> handler calls <code>StateHasChanged</code>.</p>
+</div>
+
+@code {
+    private readonly ErrorTally _errors = new();
+    private bool _running;
+    private int _renders;
+
+    protected override void OnInitialized() => Feed.Changed += StateHasChanged;
+
+    public void Dispose() => Feed.Changed -= StateHasChanged;
+
+    private async Task RunAsync()
+    {
+        _running = true;
+        Feed.Clear();
+        _errors.Clear();
+
+        // Each Add raises Changed on the writer's thread, so StateHasChanged runs there.
+        await BackgroundWriters.RunAsync(Feed.Add, _errors.Add);
+
+        _running = false;
+    }
+
+    // Nothing catches the exception on a thread-pool thread, so .NET terminates the process.
+    private void WriteFromThreadPool() => ThreadPool.QueueUserWorkItem(_ =>
+        Feed.Add(new Message(Environment.CurrentManagedThreadId, Feed.Messages.Count)));
+}

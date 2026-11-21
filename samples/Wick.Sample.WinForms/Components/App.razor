@@ -12,6 +12,17 @@
         <BatchCard />
         <LogCard />
     </div>
+
+    <h1 class="section">Writes from background threads</h1>
+    <p class="lead">
+        Both cards run the same threads writing the same messages. The classic card is what makes a Blazor Hybrid
+        app crash at random: the failure depends on a render overlapping a write.
+    </p>
+
+    <div class="cards">
+        <ClassicThreadsCard />
+        <ReactiveThreadsCard />
+    </div>
 </main>
 
 @code {

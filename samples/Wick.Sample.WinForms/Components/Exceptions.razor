@@ -1,0 +1,18 @@
+@if (Tally.IsEmpty)
+{
+    <p class="ok">No exceptions</p>
+}
+else
+{
+    <ul class="log errors">
+        @foreach (var (text, count) in Tally.Entries)
+        {
+            <li>@count.ToString("N0")× @text</li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public ErrorTally Tally { get; set; } = null!;
+}
