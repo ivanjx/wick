@@ -4,13 +4,14 @@
 @inject ClassicFeedState Feed
 
 <div class="card" id="classic-threads-card">
-    <h2>Classic: List&lt;T&gt; + StateHasChanged <RenderCount Value="++_renders" /></h2>
+    <h2>Classic: Changed event + StateHasChanged <RenderCount Value="++_renders" /></h2>
     <div class="big" id="classic-threads-count">@Feed.Messages.Count.ToString("N0") <small>of @BackgroundWriters.Total.ToString("N0")</small></div>
+    <p id="classic-threads-latest">Latest: @(Feed.Latest?.ToString() ?? "none")</p>
 
     <Checkpoints Messages="Feed.Messages" />
 
     <div class="row">
-        <button id="classic-run" disabled="@_running" @onclick="RunAsync">List.Add</button>
+        <button id="classic-run" disabled="@_running" @onclick="RunAsync">Start</button>
     </div>
     <div class="row">
         <button id="classic-crash" class="danger" disabled="@_running" @onclick="WriteFromThreadPool">One write from the thread pool (crashes the app)</button>
@@ -18,7 +19,7 @@
 
     <Exceptions Tally="_errors" />
 
-    <p class="hint">@BackgroundWriters.Threads threads add to a <code>List&lt;T&gt;</code>; the <code>Changed</code> handler calls <code>StateHasChanged</code>.</p>
+    <p class="hint">@BackgroundWriters.Threads threads add to a <code>List&lt;T&gt;</code> and set <code>Latest</code>; both raise <code>Changed</code>, whose handler calls <code>StateHasChanged</code>.</p>
 </div>
 
 @code {
@@ -36,13 +37,19 @@
         Feed.Clear();
         _errors.Clear();
 
-        // Each Add raises Changed on the writer's thread, so StateHasChanged runs there.
-        await BackgroundWriters.RunAsync(Feed.Add, _errors.Add);
+        // Add and Latest raise Changed on the writer's thread, so StateHasChanged runs there.
+        await BackgroundWriters.RunAsync(
+            message =>
+            {
+                Feed.Add(message);
+                Feed.Latest = message;
+            },
+            _errors.Add);
 
         _running = false;
     }
 
     // Nothing catches the exception on a thread-pool thread, so .NET terminates the process.
     private void WriteFromThreadPool() => ThreadPool.QueueUserWorkItem(_ =>
-        Feed.Add(new Message(Environment.CurrentManagedThreadId, Feed.Messages.Count)));
+        Feed.Latest = new Message(Environment.CurrentManagedThreadId, 0));
 }

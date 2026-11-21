@@ -1,13 +1,14 @@
 @inject FeedState Feed
 
 <div class="card" id="reactive-threads-card">
-    <h2>Wick: ReactiveList, no marshalling <RenderCount Value="++_renders" /></h2>
+    <h2>Wick: [ReactiveState], no marshalling <RenderCount Value="++_renders" /></h2>
     <div class="big" id="reactive-threads-count">@Feed.Messages.Count.ToString("N0") <small>of @BackgroundWriters.Total.ToString("N0")</small></div>
+    <p id="reactive-threads-latest">Latest: @(Feed.Latest?.ToString() ?? "none")</p>
 
     <Checkpoints Messages="Feed.Messages" />
 
     <div class="row">
-        <button id="reactive-run" disabled="@_running" @onclick="RunAsync">ReactiveList.Add</button>
+        <button id="reactive-run" disabled="@_running" @onclick="RunAsync">Start</button>
     </div>
     <div class="row">
         <button id="reactive-thread-pool" class="secondary" disabled="@_running" @onclick="WriteFromThreadPool">One write from the thread pool</button>
@@ -15,7 +16,7 @@
 
     <Exceptions Tally="_errors" />
 
-    <p class="hint">The same @BackgroundWriters.Threads threads only call <code>ReactiveList.Add</code>.</p>
+    <p class="hint">The same @BackgroundWriters.Threads threads call <code>ReactiveList.Add</code> and set the <code>partial</code> property <code>Latest</code>, nothing else.</p>
 </div>
 
 @code {
@@ -27,13 +28,20 @@
     {
         _running = true;
         Feed.Messages.Clear();
+        Feed.Latest = null;
         _errors.Clear();
 
-        await BackgroundWriters.RunAsync(Feed.Messages.Add, _errors.Add);
+        await BackgroundWriters.RunAsync(
+            message =>
+            {
+                Feed.Messages.Add(message);
+                Feed.Latest = message;
+            },
+            _errors.Add);
 
         _running = false;
     }
 
     private void WriteFromThreadPool() => ThreadPool.QueueUserWorkItem(_ =>
-        Feed.Messages.Add(new Message(Environment.CurrentManagedThreadId, Feed.Messages.Count)));
+        Feed.Latest = new Message(Environment.CurrentManagedThreadId, 0));
 }

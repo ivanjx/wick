@@ -3,7 +3,7 @@
 <ul class="log">
     @foreach (var message in Messages.Where(message => message.Index % 1000 == 999))
     {
-        <li>thread @message.Thread: message @((message.Index + 1).ToString("N0"))</li>
+        <li>@message</li>
     }
 </ul>
 

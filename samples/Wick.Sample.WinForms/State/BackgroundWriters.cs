@@ -3,7 +3,10 @@ using System.Collections.Concurrent;
 namespace Wick.Sample.WinForms.State;
 
 /// <summary>One message written by a background thread.</summary>
-public sealed record Message(int Thread, int Index);
+public sealed record Message(int Thread, int Index)
+{
+    public override string ToString() => $"thread {Thread}: message {Index + 1:N0}";
+}
 
 /// <summary>
 /// Writes from several dedicated threads at once, the way a device feed, a socket or a timer would. Both thread
